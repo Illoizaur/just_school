@@ -1,48 +1,37 @@
-import pygame
+import customtkinter
 
-# Ініціалізація pygame
-pygame.init()
+UAN_TO_USD = 0.0227
+USD_TO_UAN = 44.17
+BIGGER_TEXT = ("Arial", 26)
 
-# Розміри вікна
-width, height = 800, 600
-screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption("Рух об'єкта за допомогою Enter")
+def convert_currency(amount, from_currency, to_currency):
+    amount = float(amount)
+    if from_currency == "UAN" and to_currency == "USD":
+        result = amount * UAN_TO_USD
+    elif from_currency == "USD" and to_currency == "UAN":
+        result = amount * USD_TO_UAN
+    else:        
+        result = amount
+    
+    result_label.configure(text=f"{amount} {from_currency} = {result:.2f} {to_currency}")
 
-# Початкові координати об'єкта
-object_position = pygame.math.Vector2(100, 100)
-object_size = 50 # Розмір об'єкта (квадрат)
+root = customtkinter.CTk()
+root.title("Currency Converter")
+root.geometry("400x400")
 
-# Колір об'єкта
-object_color = (255, 0, 0) # Червоний
+amount_entry = customtkinter.CTkEntry(root, placeholder_text="Enter amount", font=BIGGER_TEXT)
+amount_entry.pack(pady=10)
 
-# Головний цикл гри
-running = True
-while running:
+from_currency_var = customtkinter.StringVar(value="UAN")
+from_currency_menu = customtkinter.CTkOptionMenu(root, variable=from_currency_var, values=["UAN", "USD"], font=BIGGER_TEXT)
+from_currency_menu.pack(pady=10)
+to_currency_var = customtkinter.StringVar(value="USD")
+to_currency_menu = customtkinter.CTkOptionMenu(root, variable=to_currency_var, values=["UAN", "USD"], font=BIGGER_TEXT)
+to_currency_menu.pack(pady=10)
 
-    for event in pygame.event.get():
+convert_button = customtkinter.CTkButton(root, text="Convert", command=lambda: convert_currency(amount_entry.get(), from_currency_var.get(), to_currency_var.get()), font=BIGGER_TEXT)
+convert_button.pack(pady=10)
 
-        if event.type == pygame.QUIT:
-
-            running = False
-
-        elif event.type == pygame.KEYDOWN:
-
-        # Якщо натиснуто Enter, рухаємо об'єкт вправо
-
-            if event.key == pygame.K_RETURN:
-
-                object_position += pygame.math.Vector2(50, 0)
-
-        # Очищаємо екран
-    screen.fill((255, 255, 255)) # Білий фон
-
-        # Малюємо об'єкт
-    pygame.draw.rect(screen, object_color, (object_position.x, object_position.y, object_size, object_size))
-
-        # Оновлюємо екран
-    pygame.display.update()
-
-        # Затримка для зручності
-    pygame.time.Clock().tick(30)
-
-pygame.quit()
+result_label = customtkinter.CTkLabel(root, text="", font=BIGGER_TEXT)
+result_label.pack(pady=10)
+root.mainloop()

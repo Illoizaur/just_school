@@ -1,439 +1,69 @@
 <!DOCTYPE html>
-<html lang="uk">
-
+<html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Portfolio ChatBot</title>
-
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- Google Font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background:
-                radial-gradient(circle at top left, #1e293b 0%, #0f172a 35%, #020617 100%);
-            min-height: 100vh;
-        }
-
-        .glass {
-            background: rgba(15, 23, 42, 0.65);
-            backdrop-filter: blur(18px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .message-animation {
-            animation: fadeIn 0.25s ease-in-out;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .chat-scroll::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .chat-scroll::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 999px;
-        }
-
-        .typing-dot {
-            animation: blink 1.4s infinite;
-        }
-
-        .typing-dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .typing-dot:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-
-        @keyframes blink {
-
-            0%,
-            80%,
-            100% {
-                opacity: 0.2;
-            }
-
-            40% {
-                opacity: 1;
-            }
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
 </head>
-
-<body class="text-white flex items-center justify-center p-4">
-
-    <div class="w-full max-w-5xl h-[92vh] glass rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-
-        <!-- Header -->
-        <header class="border-b border-white/10 p-5 flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight">
-                    AI Portfolio Assistant
-                </h1>
-                <p class="text-slate-400 text-sm mt-1">
-                    Інтерактивний чат-бот для портфоліо та резюме
-                </p>
-            </div>
-
-            <div class="hidden md:flex items-center gap-3">
-                <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                <span class="text-sm text-slate-300">Online</span>
-            </div>
-        </header>
-
-        <!-- Main Content -->
-        <main class="flex-1 overflow-hidden flex flex-col">
-
-            <!-- Chat -->
-            <div id="chat" class="flex-1 overflow-y-auto chat-scroll px-4 md:px-8 py-6 space-y-5">
-
-                <!-- Welcome Message -->
-                <div class="flex items-start gap-3 message-animation">
-                    <div class="w-10 h-10 rounded-full bg-cyan-500 flex items-center justify-center font-bold">
-                        AI
-                    </div>
-
-                    <div
-                        class="max-w-[85%] md:max-w-[70%] bg-slate-800/80 rounded-2xl rounded-tl-sm px-5 py-4 shadow-lg">
-                        <p class="text-slate-100 leading-relaxed">
-                            Привіт 👋<br><br>
-                            Я твій персональний AI-помічник. Можу:
-                        </p>
-
-                        <ul class="mt-3 space-y-2 text-slate-300 text-sm">
-                            <li>• Розповісти про навички та досвід</li>
-                            <li>• Показати проєкти</li>
-                            <li>• Поспілкуватися на будь-яку тему</li>
-                            <li>• Відповісти на базові питання</li>
-                        </ul>
-
-                        <p class="mt-4 text-cyan-300 text-sm">
-                            Напиши щось нижче 👇
-                        </p>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Input Area -->
-            <div class="border-t border-white/10 p-4 md:p-5 bg-black/20">
-
-                <div class="flex items-center gap-3">
-
-                    <input id="userInput" type="text" placeholder="Напишіть повідомлення..."
-                        class="flex-1 bg-slate-900/70 border border-white/10 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-cyan-500 transition text-white placeholder:text-slate-500" />
-
-                    <button id="sendBtn"
-                        class="bg-cyan-500 hover:bg-cyan-400 active:scale-95 transition-all rounded-2xl px-6 py-4 font-semibold shadow-lg shadow-cyan-500/20">
-                        Надіслати
-                    </button>
-
-                </div>
-
-                <div class="mt-3 flex flex-wrap gap-2">
-
-                    <button class="quick-btn">
-                        Розкажи про себе
-                    </button>
-
-                    <button class="quick-btn">
-                        Які твої навички?
-                    </button>
-
-                    <button class="quick-btn">
-                        Покажи проєкти
-                    </button>
-
-                    <button class="quick-btn">
-                        Як зв'язатися?
-                    </button>
-
-                </div>
-
-            </div>
-
-        </main>
-    </div>
-
-    <script>
-        const chat = document.getElementById("chat");
-        const input = document.getElementById("userInput");
-        const sendBtn = document.getElementById("sendBtn");
-        const quickButtons = document.querySelectorAll(".quick-btn");
-
-        // Session history
-        let conversationHistory = [];
-
-        // Quick button styles
-        quickButtons.forEach(btn => {
-            btn.classList.add(
-                "bg-slate-800/80",
-                "hover:bg-slate-700",
-                "transition",
-                "text-sm",
-                "px-4",
-                "py-2",
-                "rounded-full",
-                "text-slate-200"
-            );
-
-            btn.addEventListener("click", () => {
-                input.value = btn.textContent.trim();
-                sendMessage();
-            });
-        });
-
-        // Enter key
-        input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                sendMessage();
-            }
-        });
-
-        sendBtn.addEventListener("click", sendMessage);
-
-        function addMessage(message, sender = "bot") {
-            const wrapper = document.createElement("div");
-
-            wrapper.className =
-                `flex items-start gap-3 message-animation ${sender === "user" ? "justify-end" : ""
-                }`;
-
-            const avatar = document.createElement("div");
-
-            avatar.className =
-                `w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0 ${sender === "bot"
-                    ? "bg-cyan-500"
-                    : "bg-violet-500 order-2"
-                }`;
-
-            avatar.textContent = sender === "bot" ? "AI" : "YOU";
-
-            const bubble = document.createElement("div");
-
-            bubble.className =
-                `max-w-[85%] md:max-w-[70%] px-5 py-4 rounded-2xl shadow-lg leading-relaxed ${sender === "bot"
-                    ? "bg-slate-800/80 rounded-tl-sm text-slate-100"
-                    : "bg-violet-500 rounded-tr-sm text-white order-1"
-                }`;
-
-            bubble.innerHTML = message;
-
-            if (sender === "user") {
-                wrapper.appendChild(bubble);
-                wrapper.appendChild(avatar);
-            } else {
-                wrapper.appendChild(avatar);
-                wrapper.appendChild(bubble);
-            }
-
-            chat.appendChild(wrapper);
-
-            // Save session history
-            conversationHistory.push({
-                sender,
-                message
-            });
-
-            sessionStorage.setItem(
-                "portfolioChatHistory",
-                JSON.stringify(conversationHistory)
-            );
-
-            scrollToBottom();
-        }
-
-        function scrollToBottom() {
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        // Restore session
-        window.addEventListener("load", () => {
-            const saved = sessionStorage.getItem("portfolioChatHistory");
-
-            if (saved) {
-                conversationHistory = JSON.parse(saved);
-
-                // Clear default welcome
-                const existingMessages = [...chat.children];
-                existingMessages.forEach(el => el.remove());
-
-                conversationHistory.forEach(item => {
-                    addMessage(item.message, item.sender);
-                });
-            }
-        });
-
-        function showTyping() {
-            const typing = document.createElement("div");
-            typing.id = "typing";
-
-            typing.className = "flex items-start gap-3";
-
-            typing.innerHTML = `
-        <div class="w-10 h-10 rounded-full bg-cyan-500 flex items-center justify-center font-bold">
-          AI
-        </div>
-
-        <div class="bg-slate-800/80 px-5 py-4 rounded-2xl rounded-tl-sm">
-          <div class="flex gap-1">
-            <span class="typing-dot">●</span>
-            <span class="typing-dot">●</span>
-            <span class="typing-dot">●</span>
-          </div>
-        </div>
-      `;
-
-            chat.appendChild(typing);
-            scrollToBottom();
-        }
-
-        function removeTyping() {
-            const typing = document.getElementById("typing");
-            if (typing) typing.remove();
-        }
-
-        function generateBotReply(userMessage) {
-            const msg = userMessage.toLowerCase();
-
-            // Portfolio / Resume Responses
-            if (msg.includes("привіт") || msg.includes("hello")) {
-                return `
-          Привіт 😊<br><br>
-          Радий бачити тебе тут! Питай що завгодно про досвід, навички або проєкти.
-        `;
-            }
-
-            if (
-                msg.includes("навички") ||
-                msg.includes("skills")
-            ) {
-                return `
-          💻 Основні навички:<br><br>
-
-          • HTML / CSS / JavaScript<br>
-          • React / Vue / Tailwind CSS<br>
-          • Node.js / Express<br>
-          • UI/UX Design<br>
-          • REST API Integration<br>
-          • Responsive Web Design<br><br>
-
-          Також люблю створювати інтерактивні та сучасні інтерфейси ✨
-        `;
-            }
-
-            if (
-                msg.includes("проєкт") ||
-                msg.includes("portfolio")
-            ) {
-                return `
-          🚀 Ось декілька типів проєктів:<br><br>
-
-          • AI Chat Applications<br>
-          • Landing Pages<br>
-          • SaaS Dashboard UI<br>
-          • E-commerce Websites<br>
-          • Personal Portfolio Websites<br><br>
-
-          Усі проєкти створюються з фокусом на UX, швидкість та сучасний дизайн.
-        `;
-            }
-
-            if (
-                msg.includes("контакт") ||
-                msg.includes("зв'яз") ||
-                msg.includes("email")
-            ) {
-                return `
-          📬 Можемо зв'язатися через:<br><br>
-
-          • Email: your@email.com<br>
-          • LinkedIn: linkedin.com/in/yourprofile<br>
-          • GitHub: github.com/yourprofile<br><br>
-
-          Буду радий співпраці ✨
-        `;
-            }
-
-            if (
-                msg.includes("досвід") ||
-                msg.includes("experience")
-            ) {
-                return `
-          👨‍💻 Досвід включає:<br><br>
-
-          • Frontend та Fullstack розробку<br>
-          • Розробку чат-ботів та AI UI<br>
-          • Оптимізацію продуктивності<br>
-          • Адаптивну верстку<br>
-          • Інтеграцію API та сучасних сервісів
-        `;
-            }
-
-            if (
-                msg.includes("дякую")
-            ) {
-                return `
-          Завжди радий допомогти 😊
-        `;
-            }
-
-            // Fun random responses
-            const randomReplies = [
-                "Цікаве питання 😄 Розкажи більше!",
-                "Люблю такі розмови ✨",
-                "Можу також допомогти з веб-розробкою або дизайном 🚀",
-                "Тут міг би бути інтегрований справжній AI API 🤖",
-                "Цей чат-бот легко підключається до OpenAI API 🔥",
-                "Мінімалістичний дизайн + AI = ❤️",
-                "Сучасні веб-інтерфейси — моя улюблена тема 😎"
-            ];
-
-            return randomReplies[
-                Math.floor(Math.random() * randomReplies.length)
-            ];
-        }
-
-        function sendMessage() {
-            const message = input.value.trim();
-
-            if (!message) return;
-
-            addMessage(message, "user");
-
-            input.value = "";
-
-            showTyping();
-
-            setTimeout(() => {
-                removeTyping();
-
-                const reply = generateBotReply(message);
-
-                addMessage(reply, "bot");
-            }, 900);
-        }
-    </script>
-
+<body>
+    <nav>
+        <ul>
+            <li><a href="index.html">Головна</a></li>
+            <li><a href="about.html">Про нас</a></li>
+            <li><a href="contact.html">Контакти</a></li>
+        </ul>
+    </nav>
+
+    <nav id="navigation">
+        <ul>
+            <li><a href="#1">Розділ 1</a></li>
+            <li><a href="#2">Розділ 2</a></li> 
+            <li><a href="#3">Розділ 3</a></li>
+        </ul>
+    </nav>
+
+    <h1>Головна сторінка</h1>
+    <hr>
+    <section id="1">
+        <h2><a href="#navigation">Розділ 1</a></h2>
+        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Deleniti, ex sequi laudantium exercitationem libero eos ipsum omnis, nulla aperiam alias sed eveniet ut minima praesentium rem tempore recusandae id doloremque.
+        Dolorem beatae tempora in temporibus, aperiam perspiciatis dolore doloremque eaque omnis repudiandae voluptate aut nulla dolor reprehenderit tenetur ab! Doloribus excepturi cupiditate qui veritatis mollitia? Eaque asperiores dolor labore necessitatibus!
+        Et delectus illum quo, sed earum placeat doloribus deserunt, reprehenderit harum quia tempora magni? Mollitia, consectetur quaerat libero ad officia reiciendis minus laboriosam beatae excepturi sed temporibus? Eum, eos veniam!
+        Numquam, eius. Accusamus, maiores praesentium. Numquam aut fugit odio sed autem quos dolorem amet reprehenderit, magni quibusdam deleniti mollitia adipisci rem optio fugiat praesentium sint facere delectus quas inventore accusamus!
+        Et ex adipisci hic blanditiis rerum odio dolores temporibus quis ea non error consequatur obcaecati optio soluta laborum amet, in magnam architecto magni ducimus ad doloribus, vel illo! Cupiditate, assumenda.</p>
+    </section>
+    <hr>
+    <section id="2">
+        <h2><a href="#navigation">Розділ 2</a></h2>
+        <p>Lorem ipsum dolor sit, amet consectetur adipisicing elit. Et est officia laborum nihil, nesciunt, fuga rem quos numquam recusandae quae qui accusamus animi earum porro. Hic quisquam molestiae ducimus ad?
+        Tenetur, et eaque. Harum, quis. Ullam, culpa? A nisi minima, inventore pariatur delectus deleniti enim. Sit culpa illo totam debitis distinctio optio, expedita laudantium. Nobis, eius corrupti. Nam, quas tempora.
+        Reprehenderit eaque eos deleniti voluptates itaque, cumque enim dolor quia, voluptatibus quis ipsum perferendis soluta ullam minus! Dolores temporibus perspiciatis beatae aspernatur vero necessitatibus, rem ab at asperiores voluptatibus! Aut.
+        Dolore odit possimus in deleniti autem sapiente amet nostrum quis esse quae deserunt molestias totam error a, quasi aut porro minima perferendis incidunt provident! Quibusdam natus neque voluptate ex consequatur?
+        Hic consequuntur fugiat aperiam magnam qui, ullam deleniti aliquam corrupti quod, modi doloribus eos inventore dolorem dolorum eveniet vel quaerat minima unde. Labore expedita natus voluptates quibusdam odio ad reprehenderit.
+        Alias, ad. Atque eos, optio natus repudiandae sapiente amet. Ex odit expedita possimus nemo placeat, iusto, magni libero aliquid, reprehenderit repudiandae aut nam consequatur autem quas architecto? Aspernatur, laboriosam maiores?
+        Aspernatur voluptatem mollitia nihil animi quam quod sequi omnis deleniti odio laudantium quidem veritatis molestias provident soluta iste nam laborum repellat tenetur magnam voluptatibus incidunt, cum maxime perferendis! Quia, earum?
+        Deserunt, aspernatur ex. Porro blanditiis rem omnis ratione, cupiditate voluptates quod iure minima? Architecto dolorum veritatis recusandae nam molestiae ipsum neque, similique sunt voluptates quae! Molestias cumque excepturi voluptate pariatur.
+        In eaque ea sunt inventore fugit soluta nihil assumenda adipisci fugiat eius vel corporis officia, ratione mollitia earum nisi. Minus unde, error quos obcaecati corporis ut reiciendis voluptas beatae est!
+        Explicabo quidem repudiandae voluptatem natus expedita fugit ipsam autem ullam magni nobis quas eaque placeat, nostrum illo, modi aperiam velit animi quisquam inventore beatae. Numquam iste voluptas similique ratione doloribus?</p>
+    </section>
+    <hr>
+    <section id="3">
+        <h2><a href="#navigation">Розділ 3</a></h2>
+        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Distinctio aperiam velit reiciendis vitae, sequi repellendus. Pariatur totam adipisci perspiciatis quisquam eveniet beatae, ducimus eligendi? Odio at vero non in tempora.
+        Eligendi laborum assumenda optio nobis? Sapiente nisi reprehenderit tenetur libero ex quidem ad porro tempore animi expedita nulla incidunt deserunt, voluptas fuga est qui. Illo omnis numquam aperiam possimus labore?
+        Dolorem accusamus harum ut reiciendis praesentium recusandae quae facere molestias qui non, quia ratione doloribus, voluptatibus sequi sint laboriosam obcaecati nisi. Quae, doloremque quos facilis placeat accusantium ad dicta pariatur.
+        Dolore ratione beatae esse quod eveniet nemo quos et eaque excepturi minima, ab veritatis eos ipsa dolores vero sunt eligendi perspiciatis doloremque quam odit. Ducimus deserunt mollitia incidunt perspiciatis excepturi!
+        Aliquid facere veritatis consectetur. Laboriosam expedita in consectetur repudiandae, ex repellat suscipit obcaecati, eveniet fugit inventore animi! A quos, esse sequi laborum praesentium incidunt in pariatur, asperiores, atque unde aut?
+        Quisquam magni quis deserunt placeat dolore mollitia quidem maiores obcaecati! Praesentium, mollitia vel iusto, veniam rerum eum autem repudiandae nemo, vitae eos vero atque dolorum repellendus voluptate corrupti beatae porro.
+        Harum nesciunt amet minima labore, reiciendis mollitia saepe maxime distinctio dolor ea sint inventore! Recusandae voluptate, esse, magni assumenda perspiciatis aut, atque quia hic quos nobis quas exercitationem doloribus? Molestiae.
+        Fugiat eligendi libero voluptatem neque repudiandae nobis corrupti odio quasi excepturi. Aperiam nobis libero, culpa reiciendis quisquam numquam iusto hic eum odit nemo, in rem dolores voluptate quis animi voluptatum.
+        Neque nam ipsum rerum quam officia deleniti doloribus, cumque corporis debitis dolorem ab eius earum commodi. Rem corporis amet expedita, est sapiente eaque, nemo delectus voluptatibus facilis velit molestias reiciendis.
+        Nulla sed officia, animi deleniti id rem voluptates in corrupti quisquam, ipsam quidem labore quasi illum laborum, veniam error porro. Repellendus quia, eligendi alias saepe nobis qui earum cum numquam.
+        Vel officia culpa iste quam assumenda, cumque quisquam minus excepturi suscipit nisi est praesentium quis pariatur nostrum animi consequuntur vitae exercitationem optio doloribus, incidunt dolor laborum ducimus? Animi, eligendi maiores.
+        Eligendi laudantium, enim mollitia voluptate sed laboriosam nostrum minus ducimus, voluptatum eaque amet repellendus officiis inventore! Aspernatur iste atque incidunt accusamus veniam beatae nobis enim? Fugit error libero delectus iure.
+        Officiis quaerat corrupti distinctio consequatur alias, laboriosam reiciendis dolores atque molestiae possimus quod iste, nobis omnis porro! Dicta, tenetur numquam. Provident dolore maiores dolorum, quasi molestias praesentium reiciendis fuga corporis!
+        Facilis ipsa repudiandae aperiam quod. Unde eveniet a repellat voluptatem tenetur sunt, fugit dignissimos iste recusandae, sequi rerum sed quisquam explicabo nemo magni commodi laudantium, doloremque aspernatur facere ab modi?
+        Est, quibusdam porro sequi possimus fugit quis sint cupiditate commodi perferendis odit exercitationem sunt fuga accusamus officiis enim at quasi amet ut laudantium modi officia soluta autem a! Ratione, nobis?
+    </section>
 </body>
-
 </html>
