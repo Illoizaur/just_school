@@ -1,27 +1,57 @@
-import pygame
-import random
+import mouse  
+import keyboard
+import tkinter as tk
+from tkinter import messagebox
 
-pygame.init()
-screen = pygame.display.set_mode((800, 600))
-clock = pygame.time.Clock()
+running = False   
+delay = 0 
+
+def start_clicker():
+    global running, delay     
     
-target_radius = 30
-target_pos = (random.randint(target_radius, 800 - target_radius), random.randint(target_radius, 600 - target_radius))
+    try:
+        clicks_per_second = int(вап.get())
+        if clicks_per_second <= 0:
+            raise ValueError
+    except ValueError:
+        messagebox.showerror("Помилка", "Будь ласка, введіть ціле число більше 0!")
+        return
+
+    delay = int(1000 / clicks_per_second) 
     
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_pos = event.pos
-            if (mouse_pos[0] - target_pos[0]) ** 2 + (mouse_pos[1] - target_pos[1]) ** 2 <= target_radius ** 2:
-                print("Hit!")
-                target_pos = (random.randint(target_radius, 800 - target_radius), random.randint(target_radius, 600 - target_radius))
-        
-    screen.fill((255, 255, 255))
-    pygame.draw.circle(screen, (255, 0, 0), target_pos, target_radius)
-    pygame.display.flip()
-    clock.tick(60)
-    
-pygame.quit()
+    messagebox.showinfo("Auto Clicker", "Auto Clicker розпочинає роботу.")
+    running = True
+    schedule_click()
+
+def schedule_click():
+    if running:
+        mouse.click()
+        фіва.after(delay, schedule_click)
+
+def exit_app():
+    global running    
+    running = False
+    фіва.destroy()
+
+def show_info(event):
+    messagebox.showinfo("Інформація", "Це автоклікер, він буде клікати мишкою зі швидкістю, яку ти вкажеш!")
+
+фіва = tk.Tk()
+фіва.title("авто клікер (фіва)")
+
+авіф = tk.Label(фіва, text="авто клікер (фіва) версія 1.0", font=("Roboto", 25))
+авіф.pack()
+
+вап = tk.Entry(фіва, font=("Roboto", 20))
+вап.pack()
+
+keyboard.add_hotkey('esc', exit_app)  
+keyboard.add_hotkey('F1', start_clicker)
+
+пав = tk.Button(фіва, text="старт", font=("Roboto", 15), command=start_clicker)
+пав.pack()
+
+віф = tk.Button(фіва, text="фініш", font=("Roboto", 15), command=exit_app)
+віф.pack()
+
+фіва.mainloop()
