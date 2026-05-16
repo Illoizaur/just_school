@@ -1,37 +1,49 @@
-import customtkinter
+import pygame
+import random
 
-UAN_TO_USD = 0.0227
-USD_TO_UAN = 44.17
-BIGGER_TEXT = ("Arial", 26)
+# Ініціалізація Pygame
+pygame.init()
 
-def convert_currency(amount, from_currency, to_currency):
-    amount = float(amount)
-    if from_currency == "UAN" and to_currency == "USD":
-        result = amount * UAN_TO_USD
-    elif from_currency == "USD" and to_currency == "UAN":
-        result = amount * USD_TO_UAN
-    else:        
-        result = amount
-    
-    result_label.configure(text=f"{amount} {from_currency} = {result:.2f} {to_currency}")
+# Налаштування екрана
+WIDTH, HEIGHT = 500, 500
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Aim Trainer")
 
-root = customtkinter.CTk()
-root.title("Currency Converter")
-root.geometry("400x400")
+# Кольори
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
 
-amount_entry = customtkinter.CTkEntry(root, placeholder_text="Enter amount", font=BIGGER_TEXT)
-amount_entry.pack(pady=10)
+# Початкові координати фігури
+x, y = random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - 50)
+RADIUS = 30
 
-from_currency_var = customtkinter.StringVar(value="UAN")
-from_currency_menu = customtkinter.CTkOptionMenu(root, variable=from_currency_var, values=["UAN", "USD"], font=BIGGER_TEXT)
-from_currency_menu.pack(pady=10)
-to_currency_var = customtkinter.StringVar(value="USD")
-to_currency_menu = customtkinter.CTkOptionMenu(root, variable=to_currency_var, values=["UAN", "USD"], font=BIGGER_TEXT)
-to_currency_menu.pack(pady=10)
+# Змінні для таймера
+last_move_time = 0
+MOVE_INTERVAL = 1000 # Інтервал у мілісекундах
 
-convert_button = customtkinter.CTkButton(root, text="Convert", command=lambda: convert_currency(amount_entry.get(), from_currency_var.get(), to_currency_var.get()), font=BIGGER_TEXT)
-convert_button.pack(pady=10)
+# Основний цикл гри
+running = True
 
-result_label = customtkinter.CTkLabel(root, text="", font=BIGGER_TEXT)
-result_label.pack(pady=10)
-root.mainloop()
+while running:
+
+    for event in pygame.event.get():
+
+        if event.type == pygame.QUIT:
+            running = False
+
+
+        # Записуємо в змінну поточний час
+        current_time = pygame.time.get_ticks()
+
+        # Переміщуємо фігуру у випадкове місце щосекунди
+    if current_time - last_move_time>= MOVE_INTERVAL:
+
+        x, y = random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - 50)
+        last_move_time = current_time
+
+# Очищаємо екран і малюємо нову фігурку
+screen.fill(WHITE)
+pygame.draw.circle(screen, RED, (x, y), RADIUS)
+pygame.display.flip() # Оновлюємо екран
+
+pygame.quit()
