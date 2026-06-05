@@ -1,12 +1,9 @@
-import game
-import world
+from menu import runmenu
+from game import rungame
 
-state = "menu"
+def main():
+    if runmenu():
+        rungame()
 
-while True:
-    if state == "menu":
-        state = menu.menu()
-    elif state == "game":    
-        state = game.game()
-    elif state == "quit":
-        pygame.exit...()
+if __name__ == "__main__":
+    main()
