@@ -15,7 +15,7 @@ def runmenu():
     font_165 = pygame.font.Font(None, 165)
 
     menus_stack = ["screen"]
-    start_game = False  # Прапорець для запуску гри
+    start_game = False
     
     def show():
         messagebox.showinfo("info", "hi user, this is my firstly game,btw do u like sun and my grass? okay so now ima explain you what is this game. so this sandbox game, where you spawn likee oblects and can make them roll or even break them so you can do anything. //creator: Atlantic Game Dev, Head Dev--samsoncat19//")
@@ -215,8 +215,8 @@ def runmenu():
                 for name, rect in buttons.items():
                     if rect.collidepoint(event.pos):
                         if name == "starbut":
-                            start_game = True  # Сигнал для запуску гри
-                            running = False     # Виходимо з циклу меню
+                            start_game = True
+                            running = False
                         elif name == "setbut":
                             menus_stack.append("setting")
                         elif name == "tutbut":
@@ -229,14 +229,14 @@ def runmenu():
                             menus_stack.append("nightscreen")
                         elif name == "day":
                             if len(menus_stack) > 1: menus_stack.pop()
-                            menus_stack.append("screen")
+                            menus_stack.append("screen") 
                         elif name == "calamity":
                             menus_stack.append("calamity")
 
         pygame.display.flip()
     
     pygame.quit()
-    return start_game # Повертаємо True або False для main.py
-
+    return start_game
+ 
 if __name__ == "__main__":
     runmenu()
