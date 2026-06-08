@@ -16,11 +16,12 @@ BIOME_SIZE = 300
 # --- КОЛЬОРИ БІОМІВ ТА РІДИН ---
 SKY_BLUE = (135, 180, 220)
 PLAYER_BLUE = (0, 120, 255)
-WATER_BLUE = (30, 85, 230, 180)  # Напівпрозора вода для краси
+WATER_BLUE = (30, 85, 230, 180)
 
 # Фонова стіна (печери)
 WALL_DIRT = (70, 40, 15)
 WALL_STONE = (55, 55, 55)
+WALL_DUNGEON = (45, 45, 60)
 
 # Ліс
 GRASS_GREEN = (34, 139, 34)
@@ -38,28 +39,31 @@ SAND_YELLOW = (235, 200, 100)
 SAND_DARK = (210, 170, 70)
 CACTUS_GREEN = (50, 180, 70)
 
-# Печери
+# Печери та данжі
 STONE_GRAY = (90, 90, 90)
+MOSS_GREEN = (50, 150, 60)     
+DUNGEON_BRICK = (100, 100, 130) 
+WOOD_PLATFORM = (140, 90, 40)   
+
+# Руди (Ores)
+ORE_COPPER = (184, 115, 51)
+ORE_IRON = (165, 150, 140)
+ORE_GOLD = (255, 215, 0)
+ORE_AMETHYST = (155, 40, 235)
 
 
-# --- 1. КАРТА БІОМІВ ---
+# --- КАРТА БІОМІВ ---
 def generate_biome_map(cols_count, biome_size):
     total_biomes = (cols_count // biome_size) + 1
     biome_map = []
-    
     current_biome = random.choice(["tundra", "forest", "desert"])
     biome_map.append(current_biome)
-    
     for _ in range(1, total_biomes):
-        if current_biome in ["tundra", "desert"]:
-            current_biome = "forest"
-        else:
-            current_biome = random.choice(["tundra", "forest", "desert"])
+        if current_biome in ["tundra", "desert"]: current_biome = "forest"
+        else: current_biome = random.choice(["tundra", "forest", "desert"])
         biome_map.append(current_biome)
-        
     spawn_biome_idx = 300 // biome_size
-    if spawn_biome_idx < len(biome_map):
-        biome_map[spawn_biome_idx] = "forest"
+    if spawn_biome_idx < len(biome_map): biome_map[spawn_biome_idx] = "forest"
     return biome_map
 
 BIOME_MAP = generate_biome_map(WORLD_COLS, BIOME_SIZE)
@@ -70,18 +74,20 @@ def get_biome_at(col):
     return BIOME_MAP[biome_idx]
 
 
-# --- 2. ГЕНЕРАЦІЯ СВІТУ (З озерами та підземними водами) ---
+# --- ГЕНЕРАЦІЯ СВІТУ ---
 def generate_world(cols_count):
     heights = []
     block_grid = {}  
     wall_grid = {}   
-    water_grid = {}  # Окрема сітка для води
+    water_grid = {}  
     
     seed1 = random.uniform(0, 1000)
     seed2 = random.uniform(0, 1000)
-    cave_seeds = [random.uniform(0, 500) for _ in range(4)]
     
-    # 1. Рахуємо рельєф поверхні з плавними переходами
+    cave_seeds = [random.uniform(0, 2000) for _ in range(8)]
+    ore_seeds = [random.uniform(0, 1000) for _ in range(4)]
+    
+    # 1. Рельєф
     raw_heights = []
     for col in range(cols_count):
         biome = get_biome_at(col)
@@ -106,15 +112,7 @@ def generate_world(cols_count):
         if final_height < 15: final_height = 15
         heights.append(final_height)
 
-    # Спочатку створюємо центри підземних озер (кишень)
-    underground_lakes = []
-    for _ in range(cols_count // 60):
-        lc = random.randint(100, cols_count - 100)
-        lr = random.randint(80, WORLD_ROWS - 40)
-        if not (200 <= lc <= 400):  # Подалі від спавну
-            underground_lakes.append((lc, lr, random.randint(8, 15), random.randint(4, 7)))
-
-    # 2. Заповнюємо підземелля блоками та базовими печерами
+    # 2. Заповнення шарів
     for col in range(cols_count):
         final_height = heights[col]
         is_spawn_zone = (230 <= col <= 370)
@@ -123,113 +121,144 @@ def generate_world(cols_count):
             depth = row - final_height
             is_cave = False
             
+            # Реалістичні печери
             if not is_spawn_zone and depth >= 20:
-                n1 = math.sin(col * 0.08 + cave_seeds[0]) * math.cos(row * 0.12 + cave_seeds[1])
-                n2 = math.sin(row * 0.07 + cave_seeds[2]) * math.cos(col * 0.15 + cave_seeds[3])
-                if -0.21 < (n1 + n2) < 0.21:
+                n1 = math.sin(col * 0.06 + cave_seeds[0]) * math.cos(row * 0.09 + cave_seeds[1])
+                n2 = math.sin(row * 0.05 + cave_seeds[2]) * math.cos(col * 0.11 + cave_seeds[3])
+                
+                detail_n1 = math.sin(col * 0.22 + cave_seeds[4]) * math.cos(row * 0.31 + cave_seeds[5])
+                detail_n2 = math.sin(row * 0.18 + cave_seeds[6]) * math.cos(col * 0.27 + cave_seeds[7])
+                
+                total_cave_noise = (n1 + n2) * 0.75 + (detail_n1 + detail_n2) * 0.25
+                
+                if -0.17 < total_cave_noise < 0.17:
                     is_cave = True
 
-            b_type = 1 if row == final_height else (2 if row < final_height + 10 else 3)
-            w_type = 1 if row < final_height + 10 else 2  
+            if row < final_height + 10:
+                b_type = 1 if row == final_height else 2  
+                w_type = 1
+            else:
+                b_type = 3  
+                w_type = 2
+
+            # Руди (рідкісні великі поклади)
+            if b_type == 3 and not is_cave:
+                if row < 130:
+                    if math.sin(col * 0.24 + ore_seeds[0]) * math.cos(row * 0.24 + ore_seeds[1]) > 0.94: b_type = 6 
+                    elif math.sin(col * 0.22 + ore_seeds[2]) * math.cos(row * 0.22 + seed1) > 0.95: b_type = 7 
+                else:
+                    if math.sin(col * 0.26 + ore_seeds[1]) * math.cos(row * 0.26 + ore_seeds[3]) > 0.96: b_type = 8 
+                    elif math.sin(col * 0.28 + seed2) * math.cos(row * 0.28 + ore_seeds[0]) > 0.97: b_type = 9 
 
             if not is_cave:
                 block_grid[(col, row)] = b_type
             else:
                 wall_grid[(col, row)] = w_type
 
-    # 3. Вирізаємо красиві входи ("хробаки")
+    # 3. Тунелі
     entrance_cols = []
     next_ent = 140
     while next_ent < cols_count - 140:
-        if not (210 <= next_ent <= 390):
-            entrance_cols.append(next_ent)
+        if not (210 <= next_ent <= 390): entrance_cols.append(next_ent)
         next_ent += random.randint(180, 280)
 
     for start_col in entrance_cols:
         cur_x, cur_y = float(start_col), float(heights[start_col])
         angle = random.choice([math.radians(35), math.radians(145)]) 
-        tunnel_length = random.randint(45, 75)
+        tunnel_length = random.randint(50, 80)
         
         for step in range(tunnel_length):
-            radius = 3.5 + math.sin(step * 0.3) * 1.0
-            min_c = max(0, int(cur_x - radius - 1))
-            max_c = min(cols_count, int(cur_x + radius + 1))
-            min_r = max(0, int(cur_y - radius - 1))
-            max_r = min(WORLD_ROWS, int(cur_y + radius + 1))
-            
-            for cx in range(min_c, max_c):
-                for cy in range(min_r, max_r):
+            radius = 3.2 + math.sin(step * 0.3) * 0.8
+            for cx in range(max(0, int(cur_x - radius - 1)), min(cols_count, int(cur_x + radius + 1))):
+                for cy in range(max(0, int(cur_y - radius - 1)), min(WORLD_ROWS, int(cur_y + radius + 1))):
                     if (cx - cur_x)**2 + (cy - cur_y)**2 <= radius**2:
                         if (cx, cy) in block_grid:
                             w_t = 1 if cy < heights[cx] + 10 else 2
                             del block_grid[(cx, cy)]
                             wall_grid[(cx, cy)] = w_t
-
             cur_x += math.cos(angle) * 1.2
             cur_y += math.sin(angle) * 0.9
             angle += random.uniform(-0.1, 0.1)
 
-    # 4. Створення ПІДЗЕМНИХ озер (заповнення каверн водою)
-    for (lc, lr, rad_x, rad_y) in underground_lakes:
-        for cx in range(lc - rad_x, lc + rad_x + 1):
-            for cy in range(lr - rad_y, lr + rad_y + 1):
-                if 0 <= cx < cols_count and 0 <= cy < WORLD_ROWS:
-                    # Еліптична форму каверни
-                    if ((cx - lc) / rad_x)**2 + ((cy - lr) / rad_y)**2 <= 1.0:
-                        # Завжди прибираємо блоки, створюючи грот
-                        if (cx, cy) in block_grid:
-                            del block_grid[(cx, cy)]
-                        wall_grid[(cx, cy)] = 2
-                        # Нижню половину гроту заливаємо водою
-                        if cy >= lr - int(rad_y * 0.2):
-                            water_grid[(cx, cy)] = 4
+    # 4. Підземні озера
+    for _ in range(cols_count // 70):
+        lc = random.randint(100, cols_count - 100)
+        lr = random.randint(100, WORLD_ROWS - 50)
+        if not (200 <= lc <= 400):
+            rad_x, rad_y = random.randint(10, 16), random.randint(5, 8)
+            for cx in range(lc - rad_x, lc + rad_x + 1):
+                for cy in range(lr - rad_y, lr + rad_y + 1):
+                    if 0 <= cx < cols_count and 0 <= cy < WORLD_ROWS:
+                        if ((cx - lc) / rad_x)**2 + ((cy - lr) / rad_y)**2 <= 1.0:
+                            if (cx, cy) in block_grid: del block_grid[(cx, cy)]
+                            wall_grid[(cx, cy)] = 2
+                            if cy >= lr - int(rad_y * 0.1): water_grid[(cx, cy)] = 4
 
-    # 5. Створення НАЗЕМНИХ озер (у заглибленнях лісового біому)
-    # Шукаємо локальні низини та заповнюємо їх водою, якщо вони занадто низько
+    # 5. Наземні озера
     for col in range(10, cols_count - 10):
         if get_biome_at(col) == "forest" and not (250 <= col <= 350):
-            # Якщо рівень землі нижчий за певну позначку (наприклад, 48), це може бути озеро
             lake_level = 47
             if heights[col] > lake_level:
                 for row in range(lake_level, heights[col] + 1):
-                    # Прибираємо верхні блоки трави/землі під воду
-                    if (col, row) in block_grid:
-                        del block_grid[(col, row)]
+                    if (col, row) in block_grid: del block_grid[(col, row)]
                     water_grid[(col, row)] = 4
                     wall_grid[(col, row)] = 1
 
-    # 6. Оновлення трави на нових схилах та стиках
+    # 6. Мох на поверхні каменю
+    for col in range(cols_count):
+        for row in range(95, WORLD_ROWS - 1):
+            if block_grid.get((col, row)) == 3:  
+                above_is_empty = (col, row - 1) not in block_grid
+                if above_is_empty:
+                    if random.random() < 0.65:
+                        block_grid[(col, row)] = 5  
+
+    # 7. Данжі
+    for _ in range(cols_count // 120):
+        room_w, room_h = random.randint(14, 22), random.randint(8, 12)
+        rx, ry = random.randint(100, cols_count - 100), random.randint(110, WORLD_ROWS - 40)
+        if (200 <= rx <= 400): continue 
+        
+        for cx in range(rx, rx + room_w):
+            for cy in range(ry, ry + room_h):
+                if 0 <= cx < cols_count and 0 <= cy < WORLD_ROWS:
+                    if cx == rx or cx == rx + room_w - 1 or cy == ry or cy == ry + room_h - 1:
+                        block_grid[(cx, cy)] = 10 
+                        if (cx, cy) in water_grid: del water_grid[(cx, cy)]
+                    else:
+                        if (cx, cy) in block_grid: del block_grid[(cx, cy)]
+                        if (cx, cy) in water_grid: del water_grid[(cx, cy)]
+                        wall_grid[(cx, cy)] = 3 
+                        if cy == ry + room_h - 4 and (rx + 3 <= cx <= rx + room_w - 4):
+                            block_grid[(cx, cy)] = 11 
+
+    # 8. Вирівнювання трави
     for col in range(cols_count):
         for row in range(heights[col], WORLD_ROWS):
             if (col, row) in block_grid:
                 if (col, row - 1) not in block_grid and (col, row - 1) not in water_grid:
-                    block_grid[(col, row)] = 1  
+                    if block_grid[(col, row)] in [1, 2, 3]:
+                        block_grid[(col, row)] = 1  
                 break
                     
     return heights, block_grid, wall_grid, water_grid
 
 
-# --- 3. ГЕНЕРАЦІЯ ОБ'ЄКТІВ ---
+# --- ГЕНЕРАЦІЯ ОБ'ЄКТІВ ---
 def generate_world_objects(cols_count, world_heights, block_grid, water_grid):
     objects = []
     min_distance = 8  
     last_obj_col = -min_distance 
-    
     for col in range(5, cols_count - 5):
         actual_surface_y = -1
         for row in range(world_heights[col], WORLD_ROWS):
             if (col, row) in block_grid:
                 actual_surface_y = row
                 break
-        
-        # Дерева не ростуть під водою
         if actual_surface_y != -1 and block_grid.get((col, actual_surface_y)) == 1:
-            if (col, actual_surface_y - 1) in water_grid:
-                continue
-
+            if (col, actual_surface_y - 1) in water_grid: continue
             if col - last_obj_col >= min_distance and (col, actual_surface_y - 1) not in block_grid:
                 biome = get_biome_at(col)
-                
                 if biome == "tundra" and random.random() < 0.08:
                     height = random.randint(5, 8)
                     objects.append({"type": "pine", "tile_x": col, "tile_y": actual_surface_y - height, "height": height})
@@ -240,19 +269,17 @@ def generate_world_objects(cols_count, world_heights, block_grid, water_grid):
                     last_obj_col = col
                 elif biome == "desert" and random.random() < 0.10:
                     height = random.randint(3, 6)
-                    objects.append({"type": "cactus", "tile_x": col, "tile_y": actual_surface_y - height, "height": height, "has_branches": random.choice([True, False])})
+                    objects.append({"type": "cactus", "tile_x": col, "tile_y": actual_surface_y - height, "height": height})
                     last_obj_col = col
-                    
     return objects
 
 
 def get_colliding_blocks(player_rect, block_grid):
     colliders = []
-    start_x = int(player_rect.left // TILE_SIZE)
-    end_x = int((player_rect.right // TILE_SIZE) + 1)
-    start_y = int(player_rect.top // TILE_SIZE)
-    end_y = int((player_rect.bottom // TILE_SIZE) + 1)
-
+    start_x = player_rect.left // TILE_SIZE
+    end_x = (player_rect.right // TILE_SIZE) + 1
+    start_y = player_rect.top // TILE_SIZE
+    end_y = (player_rect.bottom // TILE_SIZE) + 1
     for tx in range(start_x, end_x):
         for ty in range(start_y, end_y):
             if (tx, ty) in block_grid:
@@ -262,50 +289,37 @@ def get_colliding_blocks(player_rect, block_grid):
     return colliders
 
 
-# Перевірка: чи знаходиться гравець у воді
 def check_in_water(player_rect, water_grid):
-    start_x = int(player_rect.left // TILE_SIZE)
-    end_x = int((player_rect.right // TILE_SIZE) + 1)
-    start_y = int(player_rect.top // TILE_SIZE)
-    end_y = int((player_rect.bottom // TILE_SIZE) + 1)
-
+    start_x = player_rect.left // TILE_SIZE
+    end_x = (player_rect.right // TILE_SIZE) + 1
+    start_y = player_rect.top // TILE_SIZE
+    end_y = (player_rect.bottom // TILE_SIZE) + 1
     for tx in range(start_x, end_x):
         for ty in range(start_y, end_y):
             if (tx, ty) in water_grid:
-                w_rect = pygame.Rect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-                if player_rect.colliderect(w_rect):
-                    return True
+                if player_rect.colliderect(pygame.Rect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE)): return True
     return False
 
 
 def rungame():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Terraria Engine: Lakes & Underwater Caves")
+    pygame.display.set_caption("Terraria Engine: Digging Feature Added!")
     clock = pygame.time.Clock()
 
     world_heights, block_grid, wall_grid, water_grid = generate_world(WORLD_COLS)
     world_objects = generate_world_objects(WORLD_COLS, world_heights, block_grid, water_grid)
 
-    # Персонаж
-    player_w = 24
-    player_h = 38
+    player_w, player_h = 24, 38
     spawn_col = 300
-    
     p_x = spawn_col * TILE_SIZE + 2
     p_y = (world_heights[spawn_col] - 4) * TILE_SIZE
     player_rect = pygame.Rect(p_x, p_y, player_w, player_h)
 
-    velocity_x = 0
-    velocity_y = 0
-    acceleration = 5
-    friction = 0.80
-    
-    # Фізичні константи
-    gravity_air = 0.4
-    gravity_water = 0.12  # Знижена гравітація у воді (спливна сила)
-    jump_power_air = -9.5
-    jump_power_water = -3.5 # Плавні поштовхи вгору під час плавання
+    velocity_x, velocity_y = 0, 0
+    acceleration, friction = 5, 0.80
+    gravity_air, gravity_water = 0.4, 0.12
+    jump_power_air, jump_power_water = -9.5, -3.5
 
     is_on_ground = False
     is_touching_wall_left = False
@@ -314,48 +328,37 @@ def rungame():
     camera_x = player_rect.x - SCREEN_WIDTH // 2
     camera_y = player_rect.y - SCREEN_HEIGHT // 2
 
-    # Створюємо окрему поверхню для рендерингу напівпрозорої води
     water_surface = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
     water_surface.fill(WATER_BLUE)
 
     running = True
     while running:
         clock.tick(FPS)
-        
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+            if event.type == pygame.QUIT: running = False
 
-        # Перевіряємо середовище, де знаходиться гравець
         is_in_water = check_in_water(player_rect, water_grid)
 
-        # Керування
+        # --- КЕРУВАННЯ ГРАВЦЕМ ---
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT] or keys[pygame.K_a]: velocity_x -= acceleration
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]: velocity_x += acceleration
-
         velocity_x *= friction
         
-        # Налаштування фізики під середовище
         current_gravity = gravity_water if is_in_water else gravity_air
-        
         is_sliding = (is_touching_wall_left or is_touching_wall_right) and not is_on_ground and velocity_y > 0 and not is_in_water
         if is_sliding:
             velocity_y += current_gravity * 0.25  
             if velocity_y > 2.0: velocity_y = 2.0
         else:
             velocity_y += current_gravity
-            max_fall_speed = 4.0 if is_in_water else 12.0
-            if velocity_y > max_fall_speed: velocity_y = max_fall_speed
+            max_fall = 4.0 if is_in_water else 12.0
+            if velocity_y > max_fall: velocity_y = max_fall
 
-        is_touching_wall_left = False
-        is_touching_wall_right = False
+        is_touching_wall_left = is_touching_wall_right = False
 
-        # Рух та колізії X
+        # Рух X
         player_rect.x += int(round(velocity_x))
-        if player_rect.left < 0: player_rect.left = 0
-        if player_rect.right > WORLD_COLS * TILE_SIZE: player_rect.right = WORLD_COLS * TILE_SIZE
-
         hits = get_colliding_blocks(player_rect, block_grid)
         for block in hits:
             if velocity_x > 0:  
@@ -367,18 +370,14 @@ def rungame():
                 velocity_x = 0
                 is_touching_wall_left = True
 
-        test_rect_left = player_rect.copy()
-        test_rect_left.x -= 2
-        if get_colliding_blocks(test_rect_left, block_grid): is_touching_wall_left = True
+        test_left = player_rect.copy(); test_left.x -= 2
+        if get_colliding_blocks(test_left, block_grid): is_touching_wall_left = True
+        test_right = player_rect.copy(); test_right.x += 2
+        if get_colliding_blocks(test_right, block_grid): is_touching_wall_right = True
 
-        test_rect_right = player_rect.copy()
-        test_rect_right.x += 2
-        if get_colliding_blocks(test_rect_right, block_grid): is_touching_wall_right = True
-
-        # Рух та колізії Y
+        # Рух Y
         player_rect.y += int(round(velocity_y))
         is_on_ground = False
-        
         hits = get_colliding_blocks(player_rect, block_grid)
         for block in hits:
             if velocity_y > 0:  
@@ -389,49 +388,59 @@ def rungame():
                 player_rect.top = block.bottom
                 velocity_y = 0
 
-        # Механіка стрибків / Стрибків від стіни / Плавання
-        jump_pressed = keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]
-        if jump_pressed:
-            if is_in_water:
-                # Плавання: багаторазові легкі поштовхи вгору у воді
-                velocity_y = jump_power_water
+        # Стрибки
+        if keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]:
+            if is_in_water: velocity_y = jump_power_water
             elif is_on_ground:
                 velocity_y = jump_power_air
                 is_on_ground = False
             elif is_touching_wall_left and not is_on_ground:
-                velocity_y = jump_power_air * 0.95
-                velocity_x = 6.5  
-                is_touching_wall_left = False
+                velocity_y = jump_power_air * 0.95; velocity_x = 6.5; is_touching_wall_left = False
             elif is_touching_wall_right and not is_on_ground:
-                velocity_y = jump_power_air * 0.95
-                velocity_x = -6.5 
-                is_touching_wall_right = False
+                velocity_y = jump_power_air * 0.95; velocity_x = -6.5; is_touching_wall_right = False
 
-        if player_rect.bottom > WORLD_ROWS * TILE_SIZE:
-            current_col = int(player_rect.x // TILE_SIZE)
-            player_rect.y = (world_heights[current_col] - 4) * TILE_SIZE
-            velocity_y = 0
+        # --- МЕХАНІКА КОПАННЯ (ЛКМ) ---
+        mouse_pressed = pygame.mouse.get_pressed()
+        if mouse_pressed[0]: # Натиснуто ЛКМ
+            mouse_pos = pygame.mouse.get_pos()
+            # Перетворюємо екранні координати миші у глобальні координати світу
+            world_mouse_x = mouse_pos[0] + camera_x
+            world_mouse_y = mouse_pos[1] + camera_y
+            
+            # Визначаємо індекси тайла
+            target_col = int(world_mouse_x // TILE_SIZE)
+            target_row = int(world_mouse_y // TILE_SIZE)
+            
+            # Перевіряємо дистанцію від гравця до тайла (радіус дії інструменту — 5 блоків)
+            player_tile_x = player_rect.centerx // TILE_SIZE
+            player_tile_y = player_rect.centery // TILE_SIZE
+            distance = math.sqrt((target_col - player_tile_x)**2 + (target_row - player_tile_y)**2)
+            
+            if distance <= 5: # Якщо дотягуємося киркою
+                if (target_col, target_row) in block_grid:
+                    # Визначаємо, яка задня стіна має з'явитися замість зламаного блоку
+                    if (target_col, target_row) not in wall_grid:
+                        surface_y = world_heights[target_col]
+                        if target_row < surface_y + 10: wall_grid[(target_col, target_row)] = 1  # Земляна стіна
+                        else: wall_grid[(target_col, target_row)] = 2  # Кам'яна стіна
+                    
+                    # Видаляємо блок
+                    del block_grid[(target_col, target_row)]
 
-        # Камера
-        target_camera_x = player_rect.centerx - SCREEN_WIDTH // 2
-        camera_x += (target_camera_x - camera_x) * 0.1  
+        # Динамічна камера
+        camera_x += ((player_rect.centerx - SCREEN_WIDTH // 2) - camera_x) * 0.1  
         camera_x = max(0, min(camera_x, WORLD_COLS * TILE_SIZE - SCREEN_WIDTH))
-
-        target_camera_y = player_rect.centery - SCREEN_HEIGHT // 2
-        camera_y += (target_camera_y - camera_y) * 0.1  
+        camera_y += ((player_rect.centery - SCREEN_HEIGHT // 2) - camera_y) * 0.1  
         camera_y = max(0, min(camera_y, WORLD_ROWS * TILE_SIZE - SCREEN_HEIGHT))
 
-        # --- РЕНДЕРИНГ ---
+        # --- МАЛЮВАННЯ ---
         screen.fill(SKY_BLUE)
-
         start_col = max(0, int(camera_x // TILE_SIZE))
         end_col = min(WORLD_COLS, start_col + (SCREEN_WIDTH // TILE_SIZE) + 2)
         start_row = max(0, int(camera_y // TILE_SIZE))
         end_row = min(WORLD_ROWS, start_row + (SCREEN_HEIGHT // TILE_SIZE) + 2)
-
         int_cam_x, int_cam_y = int(camera_x), int(camera_y)
 
-        # Рендеринг блоків, стін та води
         for col in range(start_col, end_col):
             biome = get_biome_at(col)
             if biome == "tundra": c1, c2 = SNOW_WHITE, ICE_BLUE
@@ -446,52 +455,40 @@ def rungame():
                     if block_type == 1: pygame.draw.rect(screen, c1, rect)
                     elif block_type == 2: pygame.draw.rect(screen, c2, rect)
                     elif block_type == 3: pygame.draw.rect(screen, STONE_GRAY, rect)
+                    elif block_type == 5: pygame.draw.rect(screen, MOSS_GREEN, rect)
+                    elif block_type == 6: pygame.draw.rect(screen, ORE_COPPER, rect)
+                    elif block_type == 7: pygame.draw.rect(screen, ORE_IRON, rect)
+                    elif block_type == 8: pygame.draw.rect(screen, ORE_GOLD, rect)
+                    elif block_type == 9: pygame.draw.rect(screen, ORE_AMETHYST, rect)
+                    elif block_type == 10: pygame.draw.rect(screen, DUNGEON_BRICK, rect)
+                    elif block_type == 11: pygame.draw.rect(screen, WOOD_PLATFORM, rect)
                     pygame.draw.rect(screen, (0, 0, 0), rect, 1)  
                 else:
-                    # Якщо блоку немає — малюємо задній фон (стіну)
                     wall_type = wall_grid.get((col, row), 0)
                     if wall_type == 1: pygame.draw.rect(screen, WALL_DIRT, rect)
                     elif wall_type == 2: pygame.draw.rect(screen, WALL_STONE, rect)
-                    
-                    # Якщо в цій точці є вода — накладаємо її поверх задньої стіни
-                    if (col, row) in water_grid:
-                        screen.blit(water_surface, rect)
+                    elif wall_type == 3: pygame.draw.rect(screen, WALL_DUNGEON, rect)
+                    if (col, row) in water_grid: screen.blit(water_surface, rect)
 
-        # Малювання об'єктів (дерева/катуси)
+        # Дерева та кактуси
         for obj in world_objects:
             obj_screen_x = obj["tile_x"] * TILE_SIZE - int_cam_x
             if -100 < obj_screen_x < SCREEN_WIDTH + 100:
-                if obj["type"] == "normal_tree":
+                if obj["type"] in ["normal_tree", "pine"]:
                     for h in range(obj["height"]):
-                        rect = pygame.Rect(obj_screen_x, (obj["tile_y"] + h) * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE)
-                        pygame.draw.rect(screen, TRUNK_BROWN, rect)
-                    cx, cy = obj["tile_x"], obj["tile_y"]
-                    r = obj["foliage_radius"]
+                        pygame.draw.rect(screen, TRUNK_BROWN, pygame.Rect(obj_screen_x, (obj["tile_y"] + h) * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE))
+                    cx, cy, r = obj["tile_x"], obj["tile_y"], obj.get("foliage_radius", 2)
+                    foliage_color = LEAVES_GREEN if obj["type"] == "normal_tree" else (20, 80, 40)
                     for nx in range(cx - r, cx + r + 1):
-                        for ny in range(cy - r, cy + r):
+                        for ny in range(cy - r, cy + r + 1):
                             if (nx - cx)**2 + (ny - cy)**2 <= r**2:
-                                l_rect = pygame.Rect(nx * TILE_SIZE - int_cam_x, ny * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE)
-                                pygame.draw.rect(screen, LEAVES_GREEN, l_rect)
-                elif obj["type"] == "pine":
-                    for h in range(obj["height"]):
-                        rect = pygame.Rect(obj_screen_x, (obj["tile_y"] + h) * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE)
-                        pygame.draw.rect(screen, TRUNK_BROWN, rect)
-                    for h in range(obj["height"] - 2):
-                        layer_y = obj["tile_y"] + h
-                        width_factor = 2 if h > 2 else 1
-                        for dw in range(-width_factor, width_factor + 1):
-                            l_rect = pygame.Rect((obj["tile_x"] + dw) * TILE_SIZE - int_cam_x, layer_y * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE)
-                            pygame.draw.rect(screen, NEEDLES_DARKG, l_rect)
+                                pygame.draw.rect(screen, foliage_color, pygame.Rect(nx * TILE_SIZE - int_cam_x, ny * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE))
                 elif obj["type"] == "cactus":
                     for h in range(obj["height"]):
-                        rect = pygame.Rect(obj_screen_x, (obj["tile_y"] + h) * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE)
-                        pygame.draw.rect(screen, CACTUS_GREEN, rect)
+                        pygame.draw.rect(screen, CACTUS_GREEN, pygame.Rect(obj_screen_x, (obj["tile_y"] + h) * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE))
 
-        # Малювання гравця
-        player_screen_x = player_rect.x - int_cam_x
-        player_screen_y = player_rect.y - int_cam_y
-        pygame.draw.rect(screen, PLAYER_BLUE, (player_screen_x, player_screen_y, player_w, player_h))
-
+        # Гравець
+        pygame.draw.rect(screen, PLAYER_BLUE, (player_rect.x - int_cam_x, player_rect.y - int_cam_y, player_w, player_h))
         pygame.display.flip()
 
     pygame.quit()
