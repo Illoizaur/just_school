@@ -17,6 +17,7 @@ BIOME_SIZE = 300
 SKY_BLUE = (135, 180, 220)
 PLAYER_BLUE = (0, 120, 255)
 WATER_BLUE = (30, 85, 230, 180)
+ENEMY_PURPLE = (150, 50, 220) # Колір нашого моба
 
 # Фонова стіна (печери)
 WALL_DIRT = (70, 40, 15)
@@ -50,6 +51,20 @@ ORE_COPPER = (184, 115, 51)
 ORE_IRON = (165, 150, 140)
 ORE_GOLD = (255, 215, 0)
 ORE_AMETHYST = (155, 40, 235)
+
+# --- ДАНІ ПРЕДМЕТІВ ДЛЯ ІНВЕНТАРЮ ---
+BLOCK_ITEMS = {
+    1: {"name": "Grass", "color": (34, 139, 34)},
+    2: {"name": "Dirt", "color": (139, 69, 19)},
+    3: {"name": "Stone", "color": (90, 90, 90)},
+    5: {"name": "Moss Stone", "color": (50, 150, 60)},
+    6: {"name": "Copper", "color": (184, 115, 51)},
+    7: {"name": "Iron", "color": (165, 150, 140)},
+    8: {"name": "Gold", "color": (255, 215, 0)},
+    9: {"name": "Amethyst", "color": (155, 40, 235)},
+    10: {"name": "Dungeon Brick", "color": (100, 100, 130)},
+    11: {"name": "Wood Platform", "color": (140, 90, 40)}
+}
 
 
 # --- КАРТА БІОМІВ ---
@@ -232,7 +247,7 @@ def generate_world(cols_count):
                         if cy == ry + room_h - 4 and (rx + 3 <= cx <= rx + room_w - 4):
                             block_grid[(cx, cy)] = 11 
 
-    # 8. Вирівнювання трави
+    # 8. Вирівнювання探трави
     for col in range(cols_count):
         for row in range(heights[col], WORLD_ROWS):
             if (col, row) in block_grid:
@@ -304,12 +319,18 @@ def check_in_water(player_rect, water_grid):
 def rungame():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Terraria Engine: Digging Feature Added!")
+    pygame.display.set_caption("Terraria Engine: Angry Purple Slime Added!")
     clock = pygame.time.Clock()
+
+    font = pygame.font.SysFont("Arial", 12, bold=True)
+    HOTBAR_SLOTS = 10
+    inventory = [{"id": 0, "count": 0} for _ in range(HOTBAR_SLOTS)]
+    active_slot = 0
 
     world_heights, block_grid, wall_grid, water_grid = generate_world(WORLD_COLS)
     world_objects = generate_world_objects(WORLD_COLS, world_heights, block_grid, water_grid)
 
+    # Налаштування гравця
     player_w, player_h = 24, 38
     spawn_col = 300
     p_x = spawn_col * TILE_SIZE + 2
@@ -317,13 +338,28 @@ def rungame():
     player_rect = pygame.Rect(p_x, p_y, player_w, player_h)
 
     velocity_x, velocity_y = 0, 0
-    acceleration, friction = 5, 0.80
+    acceleration, friction = 0.5, 0.80  
     gravity_air, gravity_water = 0.4, 0.12
     jump_power_air, jump_power_water = -9.5, -3.5
 
     is_on_ground = False
     is_touching_wall_left = False
     is_touching_wall_right = False
+
+    # --- НАЛАШТУВАННЯ МОБА (ФІОЛЕТОВЕ КОЛО) ---
+    enemy_radius = 10
+    # Спавним ворога на 10 блоків правіше від гравця на поверхні
+    enemy_tile_x = spawn_col + 10
+    enemy_x = enemy_tile_x * TILE_SIZE
+    enemy_y = (world_heights[enemy_tile_x] - 2) * TILE_SIZE
+    # Створюємо квадратний Rect для прорахунку фізики колізій коліщатка
+    enemy_rect = pygame.Rect(enemy_x, enemy_y, enemy_radius * 2, enemy_radius * 2)
+    
+    enemy_vel_x = 0
+    enemy_vel_y = 0
+    enemy_speed = 1.1
+    enemy_wander_timer = 0
+    enemy_dir = 1 # 1 - вправо, -1 - вліво
 
     camera_x = player_rect.x - SCREEN_WIDTH // 2
     camera_y = player_rect.y - SCREEN_HEIGHT // 2
@@ -335,7 +371,21 @@ def rungame():
     while running:
         clock.tick(FPS)
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: running = False
+            if event.type == pygame.QUIT: 
+                running = False
+
+            # Перемикання слотів
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 4:    
+                    active_slot = (active_slot - 1) % HOTBAR_SLOTS
+                elif event.button == 5:  
+                    active_slot = (active_slot + 1) % HOTBAR_SLOTS
+
+            if event.type == pygame.KEYDOWN:
+                if pygame.K_1 <= event.key <= pygame.K_9:
+                    active_slot = event.key - pygame.K_1
+                elif event.key == pygame.K_0:
+                    active_slot = 9
 
         is_in_water = check_in_water(player_rect, water_grid)
 
@@ -357,7 +407,7 @@ def rungame():
 
         is_touching_wall_left = is_touching_wall_right = False
 
-        # Рух X
+        # Рух гравця X
         player_rect.x += int(round(velocity_x))
         hits = get_colliding_blocks(player_rect, block_grid)
         for block in hits:
@@ -375,7 +425,7 @@ def rungame():
         test_right = player_rect.copy(); test_right.x += 2
         if get_colliding_blocks(test_right, block_grid): is_touching_wall_right = True
 
-        # Рух Y
+        # Рух гравця Y
         player_rect.y += int(round(velocity_y))
         is_on_ground = False
         hits = get_colliding_blocks(player_rect, block_grid)
@@ -388,7 +438,7 @@ def rungame():
                 player_rect.top = block.bottom
                 velocity_y = 0
 
-        # Стрибки
+        # Стрибки гравця
         if keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]:
             if is_in_water: velocity_y = jump_power_water
             elif is_on_ground:
@@ -399,33 +449,110 @@ def rungame():
             elif is_touching_wall_right and not is_on_ground:
                 velocity_y = jump_power_air * 0.95; velocity_x = -6.5; is_touching_wall_right = False
 
-        # --- МЕХАНІКА КОПАННЯ (ЛКМ) ---
+
+        # --- ФІЗИКА ТА ШІ АГРЕСИВНОГО МОБА ---
+        # Гравітація моба
+        enemy_vel_y += gravity_air
+        if enemy_vel_y > 10.0: enemy_vel_y = 10.0
+
+        # Обчислення ШІ: відстань до гравця
+        dist_to_player = math.sqrt((player_rect.centerx - enemy_rect.centerx)**2 + (player_rect.centery - enemy_rect.centery)**2)
+        
+        if dist_to_player < 240: # Агро-режим (якщо гравець ближче ніж 12 блоків)
+            if player_rect.centerx < enemy_rect.centerx:
+                enemy_vel_x = -enemy_speed
+            else:
+                enemy_vel_x = enemy_speed
+        else: # Вільне вештання (патрулювання)
+            enemy_wander_timer -= 1
+            if enemy_wander_timer <= 0:
+                enemy_dir = random.choice([1, -1, 0]) # Зміна напрямку або зупинка
+                enemy_wander_timer = random.randint(40, 120)
+            enemy_vel_x = enemy_dir * (enemy_speed * 0.6)
+
+        # Рух моба по X та колізії
+        enemy_rect.x += int(round(enemy_vel_x))
+        enemy_hits_x = get_colliding_blocks(enemy_rect, block_grid)
+        
+        # Якщо врізався в блок по горизонталі — намагається стрибнути!
+        if enemy_hits_x:
+            for block in enemy_hits_x:
+                if enemy_vel_x > 0: enemy_rect.right = block.left
+                elif enemy_vel_x < 0: enemy_rect.left = block.right
+            # Стрибок моба вгору
+            enemy_vel_y = -6.5 
+
+        # Рух моба по Y та колізії
+        enemy_rect.y += int(round(enemy_vel_y))
+        enemy_hits_y = get_colliding_blocks(enemy_rect, block_grid)
+        for block in enemy_hits_y:
+            if enemy_vel_y > 0:
+                enemy_rect.bottom = block.top
+                enemy_vel_y = 0
+            elif enemy_vel_y < 0:
+                enemy_rect.top = block.bottom
+                enemy_vel_y = 0
+
+
+        # --- МИША: КОПАННЯ ТА БУДІВНИЦТВО ---
         mouse_pressed = pygame.mouse.get_pressed()
-        if mouse_pressed[0]: # Натиснуто ЛКМ
-            mouse_pos = pygame.mouse.get_pos()
-            # Перетворюємо екранні координати миші у глобальні координати світу
-            world_mouse_x = mouse_pos[0] + camera_x
-            world_mouse_y = mouse_pos[1] + camera_y
-            
-            # Визначаємо індекси тайла
-            target_col = int(world_mouse_x // TILE_SIZE)
-            target_row = int(world_mouse_y // TILE_SIZE)
-            
-            # Перевіряємо дистанцію від гравця до тайла (радіус дії інструменту — 5 блоків)
-            player_tile_x = player_rect.centerx // TILE_SIZE
-            player_tile_y = player_rect.centery // TILE_SIZE
-            distance = math.sqrt((target_col - player_tile_x)**2 + (target_row - player_tile_y)**2)
-            
-            if distance <= 5: # Якщо дотягуємося киркою
+        mouse_pos = pygame.mouse.get_pos()
+        
+        world_mouse_x = mouse_pos[0] + camera_x
+        world_mouse_y = mouse_pos[1] + camera_y
+        
+        target_col = int(world_mouse_x // TILE_SIZE)
+        target_row = int(world_mouse_y // TILE_SIZE)
+        
+        player_tile_x = player_rect.centerx // TILE_SIZE
+        player_tile_y = player_rect.centery // TILE_SIZE
+        
+        distance = math.sqrt((target_col - player_tile_x)**2 + (target_row - player_tile_y)**2)
+
+        if distance <= 5 and 0 <= target_col < WORLD_COLS and 0 <= target_row < WORLD_ROWS:
+            # КОПАННЯ
+            if mouse_pressed[0]: 
                 if (target_col, target_row) in block_grid:
-                    # Визначаємо, яка задня стіна має з'явитися замість зламаного блоку
-                    if (target_col, target_row) not in wall_grid:
-                        surface_y = world_heights[target_col]
-                        if target_row < surface_y + 10: wall_grid[(target_col, target_row)] = 1  # Земляна стіна
-                        else: wall_grid[(target_col, target_row)] = 2  # Кам'яна стіна
+                    broken_block_type = block_grid[(target_col, target_row)]
                     
-                    # Видаляємо блок
+                    if broken_block_type in BLOCK_ITEMS:
+                        added = False
+                        for slot in inventory:
+                            if slot["id"] == broken_block_type:
+                                slot["count"] += 1
+                                added = True
+                                break
+                        if not added:
+                            for slot in inventory:
+                                if slot["id"] == 0:
+                                    slot["id"] = broken_block_type
+                                    slot["count"] = 1
+                                    added = True
+                                    break
+                    
+                    surface_y = world_heights[target_col]
+                    if target_row >= surface_y:
+                        if (target_col, target_row) not in wall_grid:
+                            if target_row < surface_y + 10: wall_grid[(target_col, target_row)] = 1  
+                            else: wall_grid[(target_col, target_row)] = 2  
+                    else:
+                        if (target_col, target_row) in wall_grid: del wall_grid[(target_col, target_row)]
+                    
                     del block_grid[(target_col, target_row)]
+
+            # БУДІВНИЦТВО
+            elif mouse_pressed[2]: 
+                active_item = inventory[active_slot]
+                if active_item["id"] != 0 and active_item["count"] > 0:
+                    if (target_col, target_row) not in block_grid:
+                        placed_block_rect = pygame.Rect(target_col * TILE_SIZE, target_row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                        if not player_rect.colliderect(placed_block_rect):
+                            block_grid[(target_col, target_row)] = active_item["id"]
+                            if (target_col, target_row) in water_grid: del water_grid[(target_col, target_row)]
+                            active_item["count"] -= 1
+                            if active_item["count"] <= 0:
+                                active_item["id"] = 0
+                                active_item["count"] = 0
 
         # Динамічна камера
         camera_x += ((player_rect.centerx - SCREEN_WIDTH // 2) - camera_x) * 0.1  
@@ -433,7 +560,7 @@ def rungame():
         camera_y += ((player_rect.centery - SCREEN_HEIGHT // 2) - camera_y) * 0.1  
         camera_y = max(0, min(camera_y, WORLD_ROWS * TILE_SIZE - SCREEN_HEIGHT))
 
-        # --- МАЛЮВАННЯ ---
+        # --- МАЛЮВАННЯ СВІТУ ---
         screen.fill(SKY_BLUE)
         start_col = max(0, int(camera_x // TILE_SIZE))
         end_col = min(WORLD_COLS, start_col + (SCREEN_WIDTH // TILE_SIZE) + 2)
@@ -470,7 +597,7 @@ def rungame():
                     elif wall_type == 3: pygame.draw.rect(screen, WALL_DUNGEON, rect)
                     if (col, row) in water_grid: screen.blit(water_surface, rect)
 
-        # Дерева та кактуси
+        # Об'єкти світу (дерева)
         for obj in world_objects:
             obj_screen_x = obj["tile_x"] * TILE_SIZE - int_cam_x
             if -100 < obj_screen_x < SCREEN_WIDTH + 100:
@@ -487,8 +614,40 @@ def rungame():
                     for h in range(obj["height"]):
                         pygame.draw.rect(screen, CACTUS_GREEN, pygame.Rect(obj_screen_x, (obj["tile_y"] + h) * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE))
 
-        # Гравець
+        # --- МАЛЮВАННЯ МОБА ---
+        # Віднімаємо координати камери, щоб моб залишався прив'язаним до світу
+        pygame.draw.circle(screen, ENEMY_PURPLE, (enemy_rect.centerx - int_cam_x, enemy_rect.centery - int_cam_y), enemy_radius)
+
+        # Малювання гравця
         pygame.draw.rect(screen, PLAYER_BLUE, (player_rect.x - int_cam_x, player_rect.y - int_cam_y, player_w, player_h))
+        
+        # --- МАЛЮВАННЯ ІНВЕНТАРЮ ---
+        slot_size = 40
+        slot_margin = 5
+        start_x = 10
+        start_y = 10
+
+        for i in range(HOTBAR_SLOTS):
+            slot_x = start_x + i * (slot_size + slot_margin)
+            slot_rect = pygame.Rect(slot_x, start_y, slot_size, slot_size)
+            
+            slot_color = (180, 180, 180) if i == active_slot else (60, 60, 60)
+            border_color = (255, 255, 255) if i == active_slot else (30, 30, 30)
+            border_width = 3 if i == active_slot else 2
+            
+            pygame.draw.rect(screen, slot_color, slot_rect)
+            pygame.draw.rect(screen, border_color, slot_rect, border_width)
+            
+            item_data = inventory[i]
+            if item_data["id"] != 0:
+                item_info = BLOCK_ITEMS[item_data["id"]]
+                item_rect = pygame.Rect(slot_x + 8, start_y + 8, slot_size - 16, slot_size - 16)
+                pygame.draw.rect(screen, item_info["color"], item_rect)
+                pygame.draw.rect(screen, (0, 0, 0), item_rect, 1)
+                
+                text_surf = font.render(str(item_data["count"]), True, (255, 255, 255))
+                screen.blit(text_surf, (slot_x + 4, start_y + slot_size - 16))
+        
         pygame.display.flip()
 
     pygame.quit()

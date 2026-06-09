@@ -1,38 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="uk">
+
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>
-        body {
-            background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 50px;
-            position: relative;
-        }
-        h1 {
-            color: #333;
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            z-index: 1;
-        }
-        img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            z-index: 0;
-        }
-    </style>
+    <title>Коментарі до фільмів</title>
+
 </head>
+
 <body>
-    <h1>Just School</h1>
-    <img src="../../Завантажене/cat2-1024x676.jpg">
+
+    <h1>Коментарі до фільмів</h1>
+    {%
+    for
+
+    comment
+    in
+    comments
+    %}
+
+    <p><strong>користувач:</strong> {{ comment.username }} <br>
+        <strong>фільм:</strong> <em>{{ comment.movie_title }}</em> <br>
+        <strong>коментар:</strong> "{{ comment.comment }}" <br>
+        <strong>оцінка:</strong> {{ comment.movie_rating }}/5
+    </p>
+    <hr>
+
+    {%
+    endfor
+    %}
+
 </body>
+
 </html>
