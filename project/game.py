@@ -315,7 +315,6 @@ def check_in_water(player_rect, water_grid):
                 if player_rect.colliderect(pygame.Rect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE)): return True
     return False
 
-
 def rungame():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -323,6 +322,16 @@ def rungame():
     clock = pygame.time.Clock()
 
     font = pygame.font.SysFont("Arial", 12, bold=True)
+    
+    # --- НОВІ ШРИФТИ ТА НАЛАШТУВАННЯ ДЛЯ ПАУЗИ ---
+    pause_font = pygame.font.SysFont("Arial", 26, bold=True)
+    btn_font = pygame.font.SysFont("Arial", 16, bold=True)
+    is_paused = False
+    
+    # Прямокутник кнопки виходу в меню (по центру екрана)
+    menu_btn_rect = pygame.Rect(SCREEN_WIDTH // 2 - 90, SCREEN_HEIGHT // 2, 180, 40)
+    # ---------------------------------------------
+
     HOTBAR_SLOTS = 10
     inventory = [{"id": 0, "count": 0} for _ in range(HOTBAR_SLOTS)]
     active_slot = 0
@@ -348,18 +357,16 @@ def rungame():
 
     # --- НАЛАШТУВАННЯ МОБА (ФІОЛЕТОВЕ КОЛО) ---
     enemy_radius = 10
-    # Спавним ворога на 10 блоків правіше від гравця на поверхні
     enemy_tile_x = spawn_col + 10
     enemy_x = enemy_tile_x * TILE_SIZE
     enemy_y = (world_heights[enemy_tile_x] - 2) * TILE_SIZE
-    # Створюємо квадратний Rect для прорахунку фізики колізій коліщатка
     enemy_rect = pygame.Rect(enemy_x, enemy_y, enemy_radius * 2, enemy_radius * 2)
     
     enemy_vel_x = 0
     enemy_vel_y = 0
     enemy_speed = 1.1
     enemy_wander_timer = 0
-    enemy_dir = 1 # 1 - вправо, -1 - вліво
+    enemy_dir = 1 
 
     camera_x = player_rect.x - SCREEN_WIDTH // 2
     camera_y = player_rect.y - SCREEN_HEIGHT // 2
@@ -370,197 +377,206 @@ def rungame():
     running = True
     while running:
         clock.tick(FPS)
+        
+        # --- ОБРОБКА ПОДІЙ ---
         for event in pygame.event.get():
             if event.type == pygame.QUIT: 
                 running = False
 
-            # Перемикання слотів
+            # Кліки миші
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 4:    
-                    active_slot = (active_slot - 1) % HOTBAR_SLOTS
-                elif event.button == 5:  
-                    active_slot = (active_slot + 1) % HOTBAR_SLOTS
+                # Якщо гра на паузі і натиснуто ЛКМ — перевіряємо кнопку меню
+                if event.button == 1 and is_paused:
+                    if menu_btn_rect.collidepoint(event.pos):
+                        return "menu"  # Повертає сигнал в main.py для зміни екрану
 
+                # Коліщатко миші працює тільки без паузи
+                if not is_paused:
+                    if event.button == 4:    
+                        active_slot = (active_slot - 1) % HOTBAR_SLOTS
+                    elif event.button == 5:  
+                        active_slot = (active_slot + 1) % HOTBAR_SLOTS
+
+            # Натискання клавіш
             if event.type == pygame.KEYDOWN:
-                if pygame.K_1 <= event.key <= pygame.K_9:
-                    active_slot = event.key - pygame.K_1
-                elif event.key == pygame.K_0:
-                    active_slot = 9
+                if event.key == pygame.K_ESCAPE:
+                    is_paused = not is_paused  # Перемикаємо стан паузи
+                
+                # Вибір слотів цифровими клавішами працює тільки без паузи
+                if not is_paused:
+                    if pygame.K_1 <= event.key <= pygame.K_9:
+                        active_slot = event.key - pygame.K_1
+                    elif event.key == pygame.K_0:
+                        active_slot = 9
 
-        is_in_water = check_in_water(player_rect, water_grid)
+        # --- ОНОВЛЕННЯ ЛОГІКИ ГРИ (ТІЛЬКИ ЯКЩО НЕМАЄ ПАУЗИ) ---
+        if not is_paused:
+            is_in_water = check_in_water(player_rect, water_grid)
 
-        # --- КЕРУВАННЯ ГРАВЦЕМ ---
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]: velocity_x -= acceleration
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]: velocity_x += acceleration
-        velocity_x *= friction
-        
-        current_gravity = gravity_water if is_in_water else gravity_air
-        is_sliding = (is_touching_wall_left or is_touching_wall_right) and not is_on_ground and velocity_y > 0 and not is_in_water
-        if is_sliding:
-            velocity_y += current_gravity * 0.25  
-            if velocity_y > 2.0: velocity_y = 2.0
-        else:
-            velocity_y += current_gravity
-            max_fall = 4.0 if is_in_water else 12.0
-            if velocity_y > max_fall: velocity_y = max_fall
-
-        is_touching_wall_left = is_touching_wall_right = False
-
-        # Рух гравця X
-        player_rect.x += int(round(velocity_x))
-        hits = get_colliding_blocks(player_rect, block_grid)
-        for block in hits:
-            if velocity_x > 0:  
-                player_rect.right = block.left
-                velocity_x = 0
-                is_touching_wall_right = True
-            elif velocity_x < 0:  
-                player_rect.left = block.right
-                velocity_x = 0
-                is_touching_wall_left = True
-
-        test_left = player_rect.copy(); test_left.x -= 2
-        if get_colliding_blocks(test_left, block_grid): is_touching_wall_left = True
-        test_right = player_rect.copy(); test_right.x += 2
-        if get_colliding_blocks(test_right, block_grid): is_touching_wall_right = True
-
-        # Рух гравця Y
-        player_rect.y += int(round(velocity_y))
-        is_on_ground = False
-        hits = get_colliding_blocks(player_rect, block_grid)
-        for block in hits:
-            if velocity_y > 0:  
-                player_rect.bottom = block.top
-                velocity_y = 0
-                is_on_ground = True
-            elif velocity_y < 0:  
-                player_rect.top = block.bottom
-                velocity_y = 0
-
-        # Стрибки гравця
-        if keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]:
-            if is_in_water: velocity_y = jump_power_water
-            elif is_on_ground:
-                velocity_y = jump_power_air
-                is_on_ground = False
-            elif is_touching_wall_left and not is_on_ground:
-                velocity_y = jump_power_air * 0.95; velocity_x = 6.5; is_touching_wall_left = False
-            elif is_touching_wall_right and not is_on_ground:
-                velocity_y = jump_power_air * 0.95; velocity_x = -6.5; is_touching_wall_right = False
-
-
-        # --- ФІЗИКА ТА ШІ АГРЕСИВНОГО МОБА ---
-        # Гравітація моба
-        enemy_vel_y += gravity_air
-        if enemy_vel_y > 10.0: enemy_vel_y = 10.0
-
-        # Обчислення ШІ: відстань до гравця
-        dist_to_player = math.sqrt((player_rect.centerx - enemy_rect.centerx)**2 + (player_rect.centery - enemy_rect.centery)**2)
-        
-        if dist_to_player < 240: # Агро-режим (якщо гравець ближче ніж 12 блоків)
-            if player_rect.centerx < enemy_rect.centerx:
-                enemy_vel_x = -enemy_speed
+            # --- КЕРУВАННЯ ГРАВЦЕМ ---
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT] or keys[pygame.K_a]: velocity_x -= acceleration
+            if keys[pygame.K_RIGHT] or keys[pygame.K_d]: velocity_x += acceleration
+            velocity_x *= friction
+            
+            current_gravity = gravity_water if is_in_water else gravity_air
+            is_sliding = (is_touching_wall_left or is_touching_wall_right) and not is_on_ground and velocity_y > 0 and not is_in_water
+            if is_sliding:
+                velocity_y += current_gravity * 0.25  
+                if velocity_y > 2.0: velocity_y = 2.0
             else:
-                enemy_vel_x = enemy_speed
-        else: # Вільне вештання (патрулювання)
-            enemy_wander_timer -= 1
-            if enemy_wander_timer <= 0:
-                enemy_dir = random.choice([1, -1, 0]) # Зміна напрямку або зупинка
-                enemy_wander_timer = random.randint(40, 120)
-            enemy_vel_x = enemy_dir * (enemy_speed * 0.6)
+                velocity_y += current_gravity
+                max_fall = 4.0 if is_in_water else 12.0
+                if velocity_y > max_fall: velocity_y = max_fall
 
-        # Рух моба по X та колізії
-        enemy_rect.x += int(round(enemy_vel_x))
-        enemy_hits_x = get_colliding_blocks(enemy_rect, block_grid)
-        
-        # Якщо врізався в блок по горизонталі — намагається стрибнути!
-        if enemy_hits_x:
-            for block in enemy_hits_x:
-                if enemy_vel_x > 0: enemy_rect.right = block.left
-                elif enemy_vel_x < 0: enemy_rect.left = block.right
-            # Стрибок моба вгору
-            enemy_vel_y = -6.5 
+            is_touching_wall_left = is_touching_wall_right = False
 
-        # Рух моба по Y та колізії
-        enemy_rect.y += int(round(enemy_vel_y))
-        enemy_hits_y = get_colliding_blocks(enemy_rect, block_grid)
-        for block in enemy_hits_y:
-            if enemy_vel_y > 0:
-                enemy_rect.bottom = block.top
-                enemy_vel_y = 0
-            elif enemy_vel_y < 0:
-                enemy_rect.top = block.bottom
-                enemy_vel_y = 0
+            # Рух гравця X
+            player_rect.x += int(round(velocity_x))
+            hits = get_colliding_blocks(player_rect, block_grid)
+            for block in hits:
+                if velocity_x > 0:  
+                    player_rect.right = block.left
+                    velocity_x = 0
+                    is_touching_wall_right = True
+                elif velocity_x < 0:  
+                    player_rect.left = block.right
+                    velocity_x = 0
+                    is_touching_wall_left = True
 
+            test_left = player_rect.copy(); test_left.x -= 2
+            if get_colliding_blocks(test_left, block_grid): is_touching_wall_left = True
+            test_right = player_rect.copy(); test_right.x += 2
+            if get_colliding_blocks(test_right, block_grid): is_touching_wall_right = True
 
-        # --- МИША: КОПАННЯ ТА БУДІВНИЦТВО ---
-        mouse_pressed = pygame.mouse.get_pressed()
-        mouse_pos = pygame.mouse.get_pos()
-        
-        world_mouse_x = mouse_pos[0] + camera_x
-        world_mouse_y = mouse_pos[1] + camera_y
-        
-        target_col = int(world_mouse_x // TILE_SIZE)
-        target_row = int(world_mouse_y // TILE_SIZE)
-        
-        player_tile_x = player_rect.centerx // TILE_SIZE
-        player_tile_y = player_rect.centery // TILE_SIZE
-        
-        distance = math.sqrt((target_col - player_tile_x)**2 + (target_row - player_tile_y)**2)
+            # Рух гравця Y
+            player_rect.y += int(round(velocity_y))
+            is_on_ground = False
+            hits = get_colliding_blocks(player_rect, block_grid)
+            for block in hits:
+                if velocity_y > 0:  
+                    player_rect.bottom = block.top
+                    velocity_y = 0
+                    is_on_ground = True
+                elif velocity_y < 0:  
+                    player_rect.top = block.bottom
+                    velocity_y = 0
 
-        if distance <= 5 and 0 <= target_col < WORLD_COLS and 0 <= target_row < WORLD_ROWS:
-            # КОПАННЯ
-            if mouse_pressed[0]: 
-                if (target_col, target_row) in block_grid:
-                    broken_block_type = block_grid[(target_col, target_row)]
-                    
-                    if broken_block_type in BLOCK_ITEMS:
-                        added = False
-                        for slot in inventory:
-                            if slot["id"] == broken_block_type:
-                                slot["count"] += 1
-                                added = True
-                                break
-                        if not added:
+            # Стрибки гравця
+            if keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]:
+                if is_in_water: velocity_y = jump_power_water
+                elif is_on_ground:
+                    velocity_y = jump_power_air
+                    is_on_ground = False
+                elif is_touching_wall_left and not is_on_ground:
+                    velocity_y = jump_power_air * 0.95; velocity_x = 6.5; is_touching_wall_left = False
+                elif is_touching_wall_right and not is_on_ground:
+                    velocity_y = jump_power_air * 0.95; velocity_x = -6.5; is_touching_wall_right = False
+
+            # --- ФІЗИКА ТА ШІ АГРЕСИВНОГО МОБА ---
+            enemy_vel_y += gravity_air
+            if enemy_vel_y > 10.0: enemy_vel_y = 10.0
+
+            dist_to_player = math.sqrt((player_rect.centerx - enemy_rect.centerx)**2 + (player_rect.centery - enemy_rect.centery)**2)
+            
+            if dist_to_player < 240: 
+                if player_rect.centerx < enemy_rect.centerx:
+                    enemy_vel_x = -enemy_speed
+                else:
+                    enemy_vel_x = enemy_speed
+            else: 
+                enemy_wander_timer -= 1
+                if enemy_wander_timer <= 0:
+                    enemy_dir = random.choice([1, -1, 0]) 
+                    enemy_wander_timer = random.randint(40, 120)
+                enemy_vel_x = enemy_dir * (enemy_speed * 0.6)
+
+            enemy_rect.x += int(round(enemy_vel_x))
+            enemy_hits_x = get_colliding_blocks(enemy_rect, block_grid)
+            
+            if enemy_hits_x:
+                for block in enemy_hits_x:
+                    if enemy_vel_x > 0: enemy_rect.right = block.left
+                    elif enemy_vel_x < 0: enemy_rect.left = block.right
+                enemy_vel_y = -6.5 
+
+            enemy_rect.y += int(round(enemy_vel_y))
+            enemy_hits_y = get_colliding_blocks(enemy_rect, block_grid)
+            for block in enemy_hits_y:
+                if enemy_vel_y > 0:
+                    enemy_rect.bottom = block.top
+                    enemy_vel_y = 0
+                elif enemy_vel_y < 0:
+                    enemy_rect.top = block.bottom
+                    enemy_vel_y = 0
+
+            # --- МИША: КОПАННЯ ТА БУДІВНИЦТВО ---
+            mouse_pressed = pygame.mouse.get_pressed()
+            mouse_pos = pygame.mouse.get_pos()
+            
+            world_mouse_x = mouse_pos[0] + camera_x
+            world_mouse_y = mouse_pos[1] + camera_y
+            
+            target_col = int(world_mouse_x // TILE_SIZE)
+            target_row = int(world_mouse_y // TILE_SIZE)
+            
+            player_tile_x = player_rect.centerx // TILE_SIZE
+            player_tile_y = player_rect.centery // TILE_SIZE
+            
+            distance = math.sqrt((target_col - player_tile_x)**2 + (target_row - player_tile_y)**2)
+
+            if distance <= 5 and 0 <= target_col < WORLD_COLS and 0 <= target_row < WORLD_ROWS:
+                # КОПАННЯ
+                if mouse_pressed[0]: 
+                    if (target_col, target_row) in block_grid:
+                        broken_block_type = block_grid[(target_col, target_row)]
+                        
+                        if broken_block_type in BLOCK_ITEMS:
+                            added = False
                             for slot in inventory:
-                                if slot["id"] == 0:
-                                    slot["id"] = broken_block_type
-                                    slot["count"] = 1
+                                if slot["id"] == broken_block_type:
+                                    slot["count"] += 1
                                     added = True
                                     break
-                    
-                    surface_y = world_heights[target_col]
-                    if target_row >= surface_y:
-                        if (target_col, target_row) not in wall_grid:
-                            if target_row < surface_y + 10: wall_grid[(target_col, target_row)] = 1  
-                            else: wall_grid[(target_col, target_row)] = 2  
-                    else:
-                        if (target_col, target_row) in wall_grid: del wall_grid[(target_col, target_row)]
-                    
-                    del block_grid[(target_col, target_row)]
+                            if not added:
+                                for slot in inventory:
+                                    if slot["id"] == 0:
+                                        slot["id"] = broken_block_type
+                                        slot["count"] = 1
+                                        added = True
+                                        break
+                        
+                        surface_y = world_heights[target_col]
+                        if target_row >= surface_y:
+                            if (target_col, target_row) not in wall_grid:
+                                if target_row < surface_y + 10: wall_grid[(target_col, target_row)] = 1  
+                                else: wall_grid[(target_col, target_row)] = 2  
+                        else:
+                            if (target_col, target_row) in wall_grid: del wall_grid[(target_col, target_row)]
+                        
+                        del block_grid[(target_col, target_row)]
 
-            # БУДІВНИЦТВО
-            elif mouse_pressed[2]: 
-                active_item = inventory[active_slot]
-                if active_item["id"] != 0 and active_item["count"] > 0:
-                    if (target_col, target_row) not in block_grid:
-                        placed_block_rect = pygame.Rect(target_col * TILE_SIZE, target_row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-                        if not player_rect.colliderect(placed_block_rect):
-                            block_grid[(target_col, target_row)] = active_item["id"]
-                            if (target_col, target_row) in water_grid: del water_grid[(target_col, target_row)]
-                            active_item["count"] -= 1
-                            if active_item["count"] <= 0:
-                                active_item["id"] = 0
-                                active_item["count"] = 0
+                # БУДІВНИЦТВО
+                elif mouse_pressed[2]: 
+                    active_item = inventory[active_slot]
+                    if active_item["id"] != 0 and active_item["count"] > 0:
+                        if (target_col, target_row) not in block_grid:
+                            placed_block_rect = pygame.Rect(target_col * TILE_SIZE, target_row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                            if not player_rect.colliderect(placed_block_rect):
+                                block_grid[(target_col, target_row)] = active_item["id"]
+                                if (target_col, target_row) in water_grid: del water_grid[(target_col, target_row)]
+                                active_item["count"] -= 1
+                                if active_item["count"] <= 0:
+                                    active_item["id"] = 0
+                                    active_item["count"] = 0
 
-        # Динамічна камера
-        camera_x += ((player_rect.centerx - SCREEN_WIDTH // 2) - camera_x) * 0.1  
-        camera_x = max(0, min(camera_x, WORLD_COLS * TILE_SIZE - SCREEN_WIDTH))
-        camera_y += ((player_rect.centery - SCREEN_HEIGHT // 2) - camera_y) * 0.1  
-        camera_y = max(0, min(camera_y, WORLD_ROWS * TILE_SIZE - SCREEN_HEIGHT))
+            # Динамічна камера
+            camera_x += ((player_rect.centerx - SCREEN_WIDTH // 2) - camera_x) * 0.1  
+            camera_x = max(0, min(camera_x, WORLD_COLS * TILE_SIZE - SCREEN_WIDTH))
+            camera_y += ((player_rect.centery - SCREEN_HEIGHT // 2) - camera_y) * 0.1  
+            camera_y = max(0, min(camera_y, WORLD_ROWS * TILE_SIZE - SCREEN_HEIGHT))
 
-        # --- МАЛЮВАННЯ СВІТУ ---
+        # --- МАЛЮВАННЯ СВІТУ (Малюється завжди, навіть на паузі) ---
         screen.fill(SKY_BLUE)
         start_col = max(0, int(camera_x // TILE_SIZE))
         end_col = min(WORLD_COLS, start_col + (SCREEN_WIDTH // TILE_SIZE) + 2)
@@ -614,14 +630,13 @@ def rungame():
                     for h in range(obj["height"]):
                         pygame.draw.rect(screen, CACTUS_GREEN, pygame.Rect(obj_screen_x, (obj["tile_y"] + h) * TILE_SIZE - int_cam_y, TILE_SIZE, TILE_SIZE))
 
-        # --- МАЛЮВАННЯ МОБА ---
-        # Віднімаємо координати камери, щоб моб залишався прив'язаним до світу
+        # Малювання моба
         pygame.draw.circle(screen, ENEMY_PURPLE, (enemy_rect.centerx - int_cam_x, enemy_rect.centery - int_cam_y), enemy_radius)
 
         # Малювання гравця
         pygame.draw.rect(screen, PLAYER_BLUE, (player_rect.x - int_cam_x, player_rect.y - int_cam_y, player_w, player_h))
         
-        # --- МАЛЮВАННЯ ІНВЕНТАРЮ ---
+        # Малювання інвентарю
         slot_size = 40
         slot_margin = 5
         start_x = 10
@@ -647,6 +662,29 @@ def rungame():
                 
                 text_surf = font.render(str(item_data["count"]), True, (255, 255, 255))
                 screen.blit(text_surf, (slot_x + 4, start_y + slot_size - 16))
+
+        # --- ОВЕРЛЕЙ МЕНЮ ПАУЗИ (Малюється поверх усього, якщо натиснуто Esc) ---
+        if is_paused:
+            # Малюємо центральне віконце меню паузи
+            pause_box = pygame.Rect(SCREEN_WIDTH // 2 - 120, SCREEN_HEIGHT // 2 - 80, 240, 150)
+            pygame.draw.rect(screen, (40, 40, 40), pause_box)      # Темно-сірий фон
+            pygame.draw.rect(screen, (255, 255, 255), pause_box, 2) # Біла рамка
+            
+            # Текст заголовка "GAME PAUSED"
+            text_surf = pause_font.render("GAME PAUSED", True, (255, 255, 255))
+            screen.blit(text_surf, (SCREEN_WIDTH // 2 - text_surf.get_width() // 2, SCREEN_HEIGHT // 2 - 60))
+            
+            # Перевіряємо ефект наведення миші (hover) на кнопку
+            m_pos = pygame.mouse.get_pos()
+            btn_color = (180, 50, 50) if menu_btn_rect.collidepoint(m_pos) else (120, 40, 40)
+            
+            # Малюємо саму кнопку
+            pygame.draw.rect(screen, btn_color, menu_btn_rect)
+            pygame.draw.rect(screen, (255, 255, 255), menu_btn_rect, 2)
+            
+            # Текст на кнопці "Main Menu"
+            btn_text = btn_font.render("Main Menu", True, (255, 255, 255))
+            screen.blit(btn_text, (menu_btn_rect.centerx - btn_text.get_width() // 2, menu_btn_rect.centery - btn_text.get_height() // 2))
         
         pygame.display.flip()
 
