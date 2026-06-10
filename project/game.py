@@ -322,15 +322,21 @@ def rungame():
     clock = pygame.time.Clock()
 
     font = pygame.font.SysFont("Arial", 12, bold=True)
-    
-    # --- НОВІ ШРИФТИ ТА НАЛАШТУВАННЯ ДЛЯ ПАУЗИ ---
     pause_font = pygame.font.SysFont("Arial", 26, bold=True)
     btn_font = pygame.font.SysFont("Arial", 16, bold=True)
+    
+    # --- НОВІ НАЛАШТУВАННЯ: ХП ТА СМЕРТЬ ---
+    death_font = pygame.font.SysFont("Arial", 34, bold=True)
+    
+    max_health = 100
+    current_health = 100
+    damage_cooldown = 0  # Таймер невразливості (в кадрах)
+    is_dead = False
     is_paused = False
     
-    # Прямокутник кнопки виходу в меню (по центру екрана)
     menu_btn_rect = pygame.Rect(SCREEN_WIDTH // 2 - 90, SCREEN_HEIGHT // 2, 180, 40)
-    # ---------------------------------------------
+    death_btn_rect = pygame.Rect(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 + 15, 200, 40)
+    # ---------------------------------------
 
     HOTBAR_SLOTS = 10
     inventory = [{"id": 0, "count": 0} for _ in range(HOTBAR_SLOTS)]
@@ -355,7 +361,7 @@ def rungame():
     is_touching_wall_left = False
     is_touching_wall_right = False
 
-    # --- НАЛАШТУВАННЯ МОБА (ФІОЛЕТОВЕ КОЛО) ---
+    # --- НАЛАШТУВАННЯ МОБА ---
     enemy_radius = 10
     enemy_tile_x = spawn_col + 10
     enemy_x = enemy_tile_x * TILE_SIZE
@@ -383,35 +389,56 @@ def rungame():
             if event.type == pygame.QUIT: 
                 running = False
 
-            # Кліки миші
             if event.type == pygame.MOUSEBUTTONDOWN:
-                # Якщо гра на паузі і натиснуто ЛКМ — перевіряємо кнопку меню
-                if event.button == 1 and is_paused:
-                    if menu_btn_rect.collidepoint(event.pos):
-                        return "menu"  # Повертає сигнал в main.py для зміни екрану
+                if event.button == 1:
+                    # Клік у меню паузи
+                    if is_paused and menu_btn_rect.collidepoint(event.pos):
+                        return "menu"
+                    # Клік на екрані смерті
+                    if is_dead and death_btn_rect.collidepoint(event.pos):
+                        return "menu"
 
-                # Коліщатко миші працює тільки без паузи
-                if not is_paused:
+                # Коліщатко працює лише якщо гра активна
+                if not is_paused and not is_dead:
                     if event.button == 4:    
                         active_slot = (active_slot - 1) % HOTBAR_SLOTS
                     elif event.button == 5:  
                         active_slot = (active_slot + 1) % HOTBAR_SLOTS
 
-            # Натискання клавіш
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    is_paused = not is_paused  # Перемикаємо стан паузи
+                # Пауза працює, тільки якщо гравець живий
+                if event.key == pygame.K_ESCAPE and not is_dead:
+                    is_paused = not is_paused
                 
-                # Вибір слотів цифровими клавішами працює тільки без паузи
-                if not is_paused:
+                if not is_paused and not is_dead:
                     if pygame.K_1 <= event.key <= pygame.K_9:
                         active_slot = event.key - pygame.K_1
                     elif event.key == pygame.K_0:
                         active_slot = 9
 
-        # --- ОНОВЛЕННЯ ЛОГІКИ ГРИ (ТІЛЬКИ ЯКЩО НЕМАЄ ПАУЗИ) ---
-        if not is_paused:
+        # --- ОНОВЛЕННЯ ЛОГІКИ ГРИ (ЯКЩО НЕ ПАУЗА І ГРАВЕЦЬ ЖИВИЙ) ---
+        if not is_paused and not is_dead:
             is_in_water = check_in_water(player_rect, water_grid)
+
+            # Тікання таймера невразливості
+            if damage_cooldown > 0:
+                damage_cooldown -= 1
+
+            # --- ПЕРЕВІРКА АТАКИ МОБА ---
+            if player_rect.colliderect(enemy_rect) and damage_cooldown == 0:
+                current_health -= 25  # Знімаємо 25 ХП за удар
+                damage_cooldown = 45  # 0.75 секунди невразливості (при 60 FPS)
+                
+                # Простенький ефект відкидання (knockback)
+                if player_rect.centerx < enemy_rect.centerx:
+                    velocity_x = -7
+                else:
+                    velocity_x = 7
+                velocity_y = -4  # Гравець трохи підстрибує від удару
+
+                if current_health <= 0:
+                    current_health = 0
+                    is_dead = True
 
             # --- КЕРУВАННЯ ГРАВЦЕМ ---
             keys = pygame.key.get_pressed()
@@ -473,7 +500,7 @@ def rungame():
                 elif is_touching_wall_right and not is_on_ground:
                     velocity_y = jump_power_air * 0.95; velocity_x = -6.5; is_touching_wall_right = False
 
-            # --- ФІЗИКА ТА ШІ АГРЕСИВНОГО МОБА ---
+            # --- ФІЗИКА ТА ШІ МОБА ---
             enemy_vel_y += gravity_air
             if enemy_vel_y > 10.0: enemy_vel_y = 10.0
 
@@ -526,7 +553,6 @@ def rungame():
             distance = math.sqrt((target_col - player_tile_x)**2 + (target_row - player_tile_y)**2)
 
             if distance <= 5 and 0 <= target_col < WORLD_COLS and 0 <= target_row < WORLD_ROWS:
-                # КОПАННЯ
                 if mouse_pressed[0]: 
                     if (target_col, target_row) in block_grid:
                         broken_block_type = block_grid[(target_col, target_row)]
@@ -556,7 +582,6 @@ def rungame():
                         
                         del block_grid[(target_col, target_row)]
 
-                # БУДІВНИЦТВО
                 elif mouse_pressed[2]: 
                     active_item = inventory[active_slot]
                     if active_item["id"] != 0 and active_item["count"] > 0:
@@ -576,7 +601,7 @@ def rungame():
             camera_y += ((player_rect.centery - SCREEN_HEIGHT // 2) - camera_y) * 0.1  
             camera_y = max(0, min(camera_y, WORLD_ROWS * TILE_SIZE - SCREEN_HEIGHT))
 
-        # --- МАЛЮВАННЯ СВІТУ (Малюється завжди, навіть на паузі) ---
+        # --- МАЛЮВАННЯ СВІТУ ---
         screen.fill(SKY_BLUE)
         start_col = max(0, int(camera_x // TILE_SIZE))
         end_col = min(WORLD_COLS, start_col + (SCREEN_WIDTH // TILE_SIZE) + 2)
@@ -613,7 +638,7 @@ def rungame():
                     elif wall_type == 3: pygame.draw.rect(screen, WALL_DUNGEON, rect)
                     if (col, row) in water_grid: screen.blit(water_surface, rect)
 
-        # Об'єкти світу (дерева)
+        # Дерева
         for obj in world_objects:
             obj_screen_x = obj["tile_x"] * TILE_SIZE - int_cam_x
             if -100 < obj_screen_x < SCREEN_WIDTH + 100:
@@ -633,8 +658,12 @@ def rungame():
         # Малювання моба
         pygame.draw.circle(screen, ENEMY_PURPLE, (enemy_rect.centerx - int_cam_x, enemy_rect.centery - int_cam_y), enemy_radius)
 
-        # Малювання гравця
-        pygame.draw.rect(screen, PLAYER_BLUE, (player_rect.x - int_cam_x, player_rect.y - int_cam_y, player_w, player_h))
+        # Малювання гравця (мигає червоним, якщо отримав пошкодження)
+        if not is_dead and damage_cooldown > 0 and (damage_cooldown // 4) % 2 == 0:
+            # Тимчасово не малюємо або малюємо інакше для ефекту миготіння
+            pygame.draw.rect(screen, (255, 100, 100), (player_rect.x - int_cam_x, player_rect.y - int_cam_y, player_w, player_h))
+        elif not is_dead:
+            pygame.draw.rect(screen, PLAYER_BLUE, (player_rect.x - int_cam_x, player_rect.y - int_cam_y, player_w, player_h))
         
         # Малювання інвентарю
         slot_size = 40
@@ -645,7 +674,6 @@ def rungame():
         for i in range(HOTBAR_SLOTS):
             slot_x = start_x + i * (slot_size + slot_margin)
             slot_rect = pygame.Rect(slot_x, start_y, slot_size, slot_size)
-            
             slot_color = (180, 180, 180) if i == active_slot else (60, 60, 60)
             border_color = (255, 255, 255) if i == active_slot else (30, 30, 30)
             border_width = 3 if i == active_slot else 2
@@ -663,28 +691,62 @@ def rungame():
                 text_surf = font.render(str(item_data["count"]), True, (255, 255, 255))
                 screen.blit(text_surf, (slot_x + 4, start_y + slot_size - 16))
 
-        # --- ОВЕРЛЕЙ МЕНЮ ПАУЗИ (Малюється поверх усього, якщо натиснуто Esc) ---
-        if is_paused:
-            # Малюємо центральне віконце меню паузи
+        # --- НОВИЙ ІНТЕРФЕЙС: ХП БАР (У верхньому правому кутку) ---
+        hp_bar_width = 160
+        hp_bar_height = 16
+        hp_x = SCREEN_WIDTH - hp_bar_width - 15
+        hp_y = 15
+        
+        # Фон бару (темний)
+        pygame.draw.rect(screen, (40, 10, 10), (hp_x, hp_y, hp_bar_width, hp_bar_height))
+        # Смужка здоров'я (червона)
+        health_ratio = current_health / max_health
+        if health_ratio > 0:
+            pygame.draw.rect(screen, (220, 40, 40), (hp_x, hp_y, int(hp_bar_width * health_ratio), hp_bar_height))
+        # Біла рамка
+        pygame.draw.rect(screen, (255, 255, 255), (hp_x, hp_y, hp_bar_width, hp_bar_height), 1)
+        
+        # Текст із точним цифровим значенням ХП
+        hp_text = font.render(f"HP: {current_health} / {max_health}", True, (255, 255, 255))
+        screen.blit(hp_text, (hp_x + 10, hp_y + 2))
+
+        # --- ОВЕРЛЕЙ МЕНЮ ПАУЗИ ---
+        if is_paused and not is_dead:
             pause_box = pygame.Rect(SCREEN_WIDTH // 2 - 120, SCREEN_HEIGHT // 2 - 80, 240, 150)
-            pygame.draw.rect(screen, (40, 40, 40), pause_box)      # Темно-сірий фон
-            pygame.draw.rect(screen, (255, 255, 255), pause_box, 2) # Біла рамка
+            pygame.draw.rect(screen, (40, 40, 40), pause_box)      
+            pygame.draw.rect(screen, (255, 255, 255), pause_box, 2) 
             
-            # Текст заголовка "GAME PAUSED"
             text_surf = pause_font.render("GAME PAUSED", True, (255, 255, 255))
             screen.blit(text_surf, (SCREEN_WIDTH // 2 - text_surf.get_width() // 2, SCREEN_HEIGHT // 2 - 60))
             
-            # Перевіряємо ефект наведення миші (hover) на кнопку
             m_pos = pygame.mouse.get_pos()
             btn_color = (180, 50, 50) if menu_btn_rect.collidepoint(m_pos) else (120, 40, 40)
             
-            # Малюємо саму кнопку
             pygame.draw.rect(screen, btn_color, menu_btn_rect)
             pygame.draw.rect(screen, (255, 255, 255), menu_btn_rect, 2)
             
-            # Текст на кнопці "Main Menu"
             btn_text = btn_font.render("Main Menu", True, (255, 255, 255))
             screen.blit(btn_text, (menu_btn_rect.centerx - btn_text.get_width() // 2, menu_btn_rect.centery - btn_text.get_height() // 2))
+
+        # --- НОВИЙ ОВЕРЛЕЙ: ЕКРАН СМЕРТІ ---
+        if is_dead:
+            death_box = pygame.Rect(SCREEN_WIDTH // 2 - 140, SCREEN_HEIGHT // 2 - 80, 280, 160)
+            pygame.draw.rect(screen, (25, 15, 15), death_box)        # Бордово-чорний фон
+            pygame.draw.rect(screen, (240, 40, 40), death_box, 2)    # Яскраво-червона рамка
+            
+            # Напис "YOU DIED"
+            text_surf = death_font.render("YOU DIED", True, (240, 40, 40))
+            screen.blit(text_surf, (SCREEN_WIDTH // 2 - text_surf.get_width() // 2, SCREEN_HEIGHT // 2 - 55))
+            
+            # Кнопка виходу з ховером
+            m_pos = pygame.mouse.get_pos()
+            btn_color = (180, 40, 40) if death_btn_rect.collidepoint(m_pos) else (110, 25, 25)
+            
+            pygame.draw.rect(screen, btn_color, death_btn_rect)
+            pygame.draw.rect(screen, (255, 255, 255), death_btn_rect, 2)
+            
+            btn_text = btn_font.render("Return to Main Menu", True, (255, 255, 255))
+            screen.blit(btn_text, (death_btn_rect.centerx - btn_text.get_width() // 2, death_btn_rect.centery - btn_text.get_height() // 2))
         
         pygame.display.flip()
 
