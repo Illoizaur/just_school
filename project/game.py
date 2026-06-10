@@ -247,7 +247,7 @@ def generate_world(cols_count):
                         if cy == ry + room_h - 4 and (rx + 3 <= cx <= rx + room_w - 4):
                             block_grid[(cx, cy)] = 11 
 
-    # 8. Вирівнювання探трави
+    # 8. Вирівнювання трави
     for col in range(cols_count):
         for row in range(heights[col], WORLD_ROWS):
             if (col, row) in block_grid:
@@ -314,6 +314,41 @@ def check_in_water(player_rect, water_grid):
             if (tx, ty) in water_grid:
                 if player_rect.colliderect(pygame.Rect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE)): return True
     return False
+
+# --- ФУНКЦІЯ ДЛЯ МАЛЮВАННЯ СЕРДЕЧОК ---
+# --- ФУНКЦІЯ ДЛЯ МАЛЮВАННЯ СЕРДЕЧОК (Збільшена версія) ---
+def draw_hud_heart(surf, x, y, hp_val):
+    red = (240, 50, 50)          # Яскравіший червоний
+    dark_crimson = (60, 20, 20)  # Темний для порожніх сердець
+    black = (0, 0, 0)            # Контур
+    
+    # Визначаємо кольори лівої та правої половинок
+    if hp_val >= 10:
+        cl, cr = red, red
+    elif hp_val >= 5:
+        cl, cr = red, dark_crimson
+    else:
+        cl, cr = dark_crimson, dark_crimson
+
+    # Внутрішня геометрія великого серця (ширина 22px, висота 22px)
+    def draw_core(c_l, c_r, ox, oy):
+        # Ліве вушко
+        pygame.draw.ellipse(surf, c_l, (ox, oy, 12, 12))
+        # Праве вушко
+        pygame.draw.ellipse(surf, c_r, (ox + 10, oy, 12, 12))
+        # Нижня ліва частина
+        pygame.draw.polygon(surf, c_l, [(ox, oy + 6), (ox + 11, oy + 22), (ox + 11, oy + 6)])
+        # Нижня права частина
+        pygame.draw.polygon(surf, c_r, [(ox + 11, oy + 6), (ox + 11, oy + 22), (ox + 22, oy + 6)])
+
+    # 1. Малюємо щільну чорну обводку навколо
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            if dx != 0 or dy != 0:
+                draw_core(black, black, x + dx, y + dy)
+                
+    # 2. Малюємо кольорове серце поверх контуру
+    draw_core(cl, cr, x, y)
 
 def rungame():
     pygame.init()
@@ -691,24 +726,31 @@ def rungame():
                 text_surf = font.render(str(item_data["count"]), True, (255, 255, 255))
                 screen.blit(text_surf, (slot_x + 4, start_y + slot_size - 16))
 
-        # --- НОВИЙ ІНТЕРФЕЙС: ХП БАР (У верхньому правому кутку) ---
-        hp_bar_width = 160
-        hp_bar_height = 16
-        hp_x = SCREEN_WIDTH - hp_bar_width - 15
+        # --- ОНОВЛЕНИЙ ІНТЕРФЕЙС: СЕРДЕЧКА ЗАМІСТЬ СМУЖКИ ХП ---
+        hearts_count = max_health // 10  # Отримуємо 10 сердечок
+        heart_spacing = 18               # Відстань між сердечками
+        total_hearts_width = hearts_count * heart_spacing - 2
+        hp_x = SCREEN_WIDTH - total_hearts_width - 15
         hp_y = 15
         
-        # Фон бару (темний)
-        pygame.draw.rect(screen, (40, 10, 10), (hp_x, hp_y, hp_bar_width, hp_bar_height))
-        # Смужка здоров'я (червона)
-        health_ratio = current_health / max_health
-        if health_ratio > 0:
-            pygame.draw.rect(screen, (220, 40, 40), (hp_x, hp_y, int(hp_bar_width * health_ratio), hp_bar_height))
-        # Біла рамка
-        pygame.draw.rect(screen, (255, 255, 255), (hp_x, hp_y, hp_bar_width, hp_bar_height), 1)
-        
-        # Текст із точним цифровим значенням ХП
+        for i in range(hearts_count):
+            # Обчислюємо поріг здоров'я для кожного окремого серця
+            # Наприклад, для 3-го серця (i=2) повне ХП — це 30, а половинка — 25.
+            heart_threshold = (i + 1) * 10
+            
+            if current_health >= heart_threshold:
+                heart_hp = 10  # Повне серце
+            elif current_health >= heart_threshold - 5:
+                heart_hp = 5   # Половинка серця
+            else:
+                heart_hp = 0   # Порожнє серце
+                
+            # Малюємо серце у відповідній позиції
+            draw_hud_heart(screen, hp_x + i * heart_spacing, hp_y, heart_hp)
+            
+        # Текст із цифровим значенням під сердечками
         hp_text = font.render(f"HP: {current_health} / {max_health}", True, (255, 255, 255))
-        screen.blit(hp_text, (hp_x + 10, hp_y + 2))
+        screen.blit(hp_text, (SCREEN_WIDTH - hp_text.get_width() - 15, hp_y + 18))
 
         # --- ОВЕРЛЕЙ МЕНЮ ПАУЗИ ---
         if is_paused and not is_dead:
